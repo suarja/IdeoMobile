@@ -26,10 +26,32 @@ export function SettingsScreen() {
       <FocusAwareStatusBar />
 
       <ScrollView>
-        <View className="flex-1 px-4 pt-16">
-          <Text className="text-xl font-bold">
-            {translate('settings.title')}
-          </Text>
+        <View className="flex-1 px-4">
+          {/* Profile header */}
+          <View className="items-center pt-16 pb-8">
+            <View
+              className="mb-3 size-20 items-center justify-center rounded-full"
+              style={{ backgroundColor: '#433831' }}
+            >
+              <Text className="text-3xl" style={{ color: '#FCFAEA' }}>V</Text>
+            </View>
+            <Text className="text-lg font-semibold" style={{ color: '#433831' }}>
+              {translate('profile.username')}
+            </Text>
+            <View
+              className="mt-1 rounded-full px-3 py-0.5"
+              style={{
+                backgroundColor: '#FDF4CD',
+                borderWidth: 1,
+                borderColor: '#E8D88A',
+              }}
+            >
+              <Text className="text-xs font-medium" style={{ color: '#433831' }}>
+                {translate('profile.free_plan')}
+              </Text>
+            </View>
+          </View>
+
           <SettingsContainer title="settings.generale">
             <LanguageItem />
             <ThemeItem />

@@ -1,6 +1,22 @@
 {
+  "focus": {
+    "daily_objective": "Today's objective",
+    "interactions": "Recent interactions",
+    "points": "Points",
+    "streak": "Streak",
+    "title": "Focus"
+  },
+  "idea": {
+    "cta": "Talk about your idea",
+    "subtitle": "Press and describe what you want to build"
+  },
   "onboarding": {
     "message": "Welcome to obytes app site"
+  },
+  "profile": {
+    "free_plan": "Free plan",
+    "title": "Profile",
+    "username": "Vibe Coder"
   },
   "settings": {
     "about": "About",

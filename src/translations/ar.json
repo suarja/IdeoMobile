@@ -1,6 +1,22 @@
 {
+  "focus": {
+    "daily_objective": "هدف اليوم",
+    "interactions": "التفاعلات الأخيرة",
+    "points": "النقاط",
+    "streak": "السلسلة",
+    "title": "التركيز"
+  },
+  "idea": {
+    "cta": "تحدث عن فكرتك",
+    "subtitle": "اضغط وصف ما تريد بناءه"
+  },
   "onboarding": {
     "message": "مرحبا بكم في موقع تطبيق obytes"
+  },
+  "profile": {
+    "free_plan": "الخطة المجانية",
+    "title": "الملف الشخصي",
+    "username": "مبرمج الأفكار"
   },
   "settings": {
     "about": "حول التطبيق ",
