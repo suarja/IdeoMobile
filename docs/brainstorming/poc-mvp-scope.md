@@ -80,38 +80,43 @@ Ce n'est pas un chatbot. C'est un agent qui :
 
 ## 5. Architecture Mémoire de l'Agent
 
-Inspiré de `chris-app-agent.md` + Anthropic Memory Tool (`memory_20250818`) + Vercel AI SDK.
+Implémentée via `@convex-dev/agent` (v0.3.2) sur Convex. Le LLM provider est `@ai-sdk/anthropic`.
 
-### Approche recommandée : Anthropic Native Memory Tool
+### Stack agent confirmé
 
-- L'outil `memory_20250818` est client-side : c'est le backend Ideo qui implémente le handler (lit/écrit dans une DB)
-- L'agent appelle automatiquement cet outil en début de session (`view` du répertoire mémoire) et en fin de session (`create` / `str_replace`)
-- Tout est en fichiers structurés (Markdown) dans un répertoire `/memories/` virtuel par utilisateur
+- **Orchestration :** `@convex-dev/agent` — gère le threading, la compaction de contexte, et le RAG
+- **LLM provider :** `@ai-sdk/anthropic` (adaptateur Vercel AI SDK) → Claude Sonnet 4.6
+- **Note :** `testAgent` utilise actuellement GPT-4o — migration vers `@ai-sdk/anthropic` + Sonnet 4.6 à planifier
 
-### 3 couches de mémoire
+### 3 couches de mémoire (Convex-native)
 
-| Type | Fichiers | Chargé quand |
+| Type | Implémentation précédente | Nouvelle implémentation |
 |---|---|---|
-| **Session** | Conversation en cours (context window) | Toujours |
-| **Persistante** | `project_state.md`, `user_profile.md`, `progress_log.md` | Début de chaque session (auto) |
-| **Archivale** | Summaries de sessions passées, décisions passées | À la demande (si pertinent) |
+| **Session** | Context window + compaction Anthropic | Thread `@convex-dev/agent` — compaction de contexte auto-gérée |
+| **Persistante** | `project_state.md`, `user_profile.md`, `progress_log.md` (JSON/MMKV) | Tables Convex : `projects`, `userProfiles`, `sessions` (typées, queryables) |
+| **Archivale** | Summaries manuels + Anthropic memory tool | Convex vector search + RAG sur l'historique des messages de thread |
+
+### Architecture RAG
+
+- Les embeddings sont stockés dans un index vectoriel Convex (support natif)
+- `@convex-dev/agent` peut être configuré pour récupérer le contexte passé pertinent avant chaque session
+- Permet la récupération sémantique : "qu'est-ce qu'on avait décidé sur la tech stack la semaine dernière ?"
 
 ### Cycle d'une session standup
 
-1. Démarrage → agent appelle `view /memories` → lit `progress_log.md` + `project_state.md`
-2. Conversation vocale (<2 min)
-3. Fin → agent met à jour `progress_log.md` avec résumé + insights + prochaine étape recommandée
+1. Démarrage → `@convex-dev/agent` récupère le thread existant + contexte RAG pertinent
+2. Conversation vocale (<2 min) — transcription on-device via `expo-speech-recognition`
+3. Fin → agent met à jour les tables Convex avec résumé + insights + prochaine étape recommandée
 
 ### Règles de mémoire (système prompt)
 
 - Sauvegarder proactivement sans être demandé
 - Sauvegarder systématiquement quand l'utilisateur fait une correction
-- Mémoire persistante : garder <1000 tokens (épurer régulièrement)
-- Préférer `str_replace` (mise à jour) à `create` (nouveau fichier) pour éviter la fragmentation
+- Mémoire persistante : garder <1000 tokens (épurer régulièrement via compaction auto)
 
 ### Modèle et coûts
 
-**Modèle recommandé :** Claude Sonnet 4.6 (pas Opus — coût ~$2-3/message avec Opus vs ~$0.05-0.15 avec Sonnet pour usage consumer)
+**Modèle :** Claude Sonnet 4.6 via `@ai-sdk/anthropic` (pas Opus — coût ~$2-3/message avec Opus vs ~$0.05-0.15 avec Sonnet pour usage consumer)
 
 **Coût estimé par session standup :** ~$0.05-0.15 avec Sonnet → viable à $10-20/mois en prix utilisateur final
 
@@ -124,8 +129,8 @@ Inspiré de `chris-app-agent.md` + Anthropic Memory Tool (`memory_20250818`) + V
 ### In scope
 
 - [ ] Un seul projet actif (profil projet hard-codé au lancement)
-- [ ] Capture vocale → transcription (Expo Speech / Whisper API)
-- [ ] Agent avec mémoire persistante basique (fichier JSON → MMKV local pour POC)
+- [ ] Capture vocale → transcription on-device via `expo-speech-recognition` (Whisper local, zéro coût)
+- [ ] Agent avec mémoire persistante basique (`@convex-dev/agent` + tables Convex `projects` / `sessions`)
 - [ ] Réponse de l'agent : résumé + une recommandation ou question
 - [ ] Journal de sessions (liste chronologique des standups)
 - [ ] Streak counter + points basiques
@@ -142,6 +147,21 @@ Inspiré de `chris-app-agent.md` + Anthropic Memory Tool (`memory_20250818`) + V
 - Mascotte / personnalité visuelle poussée
 - Notifications push
 - Paywall
+
+---
+
+## 6b. Stratégie Speech / Voice Processing
+
+**STT (Speech-to-Text) :**
+- **Primaire :** On-device Whisper via `expo-speech-recognition`
+  - Référence d'implémentation : https://github.com/betomoedano/whisper-speech-recognition
+  - Zéro coût, faible latence (inférence locale), capable de fonctionner hors ligne
+  - Réduit les allers-retours réseau avant que l'agent reçoive le texte
+- **Futur (MVP) :** Apple Intelligence pour classification d'intention avant STT
+
+**TTS (Text-to-Speech) :**
+- À décider : 11Labs (~500ms latence, qualité premium) vs `AVSpeechSynthesizer` natif iOS (gratuit, instantané)
+- Explorer l'intégration 11Labs native Convex vs appel direct depuis le client mobile
 
 ---
 
@@ -168,11 +188,17 @@ Ajouter au POC :
 - Quelle est la durée max acceptable d'attente de réponse de l'agent (latence) pour que l'UX reste fluide ?
 - Est-ce qu'une session <2 min est suffisante pour créer de la valeur réelle, ou faut-il 5 min minimum ?
 
-### Sur la mémoire
+### Sur la mémoire et le backend
 
-- MMKV local (POC) vs backend DB (MVP) : quand migrer ?
-- Comment structurer la mémoire persistante pour rester sous 1000 tokens ?
+- RAG natif Convex vs pipeline d'embeddings custom (ex. OpenAI embeddings) — lequel offre le meilleur rapport qualité/effort pour le POC ?
+- Quand ajouter `@ai-sdk/anthropic` à `package.json` et migrer `testAgent` depuis GPT-4o vers Sonnet 4.6 ?
+- Comment structurer la mémoire persistante pour rester sous 1000 tokens via la compaction auto de `@convex-dev/agent` ?
 - Est-ce que l'agent doit pouvoir faire des recherches web en temps réel pendant le standup ? (coût vs valeur)
+
+### Sur la voix
+
+- Apple Intelligence : prétraitement à quel moment dans le flux vocal (avant STT, après, ou pour la classification d'intention) ?
+- TTS output : 11Labs (~500ms latence, qualité premium) vs `AVSpeechSynthesizer` natif iOS (gratuit, instantané) ?
 
 ### Sur la distribution
 
@@ -181,7 +207,21 @@ Ajouter au POC :
 
 ---
 
-## 9. Stratégie de Distribution POC
+## 9. Current Backend Stack
+
+| Composant | Technologie | Statut |
+|-----------|------------|--------|
+| Hosting | Convex cloud (EU West) | ✅ Actif |
+| Agent framework | `@convex-dev/agent` 0.3.2 | ✅ Configuré |
+| LLM | Claude Sonnet 4.6 (`@ai-sdk/anthropic`) | 🔲 Nécessite `@ai-sdk/anthropic` |
+| Database | Convex (pas de schema encore) | 🔲 `schema.ts` à créer |
+| Auth | Non configuré | 🔲 `convex/auth.config.ts` à créer |
+| Speech (STT) | `expo-speech-recognition` (on-device) | 🔲 À implémenter |
+| Speech (TTS) | TBD : 11Labs ou iOS natif | 🔲 À décider |
+
+---
+
+## 10. Stratégie de Distribution POC
 
 - **Dogfooding** : chaque standup vocal devient potentiellement du contenu X/Twitter
 - **Build in public** : documenter le développement d'Ideo avec Ideo lui-même (preuve d'usage)
