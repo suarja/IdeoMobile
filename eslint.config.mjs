@@ -155,6 +155,14 @@ export default antfu(
     },
   },
 
+  // Convex files use camelCase by convention — disable kebab-case enforcement
+  {
+    files: ['convex/**/*'],
+    rules: {
+      'unicorn/filename-case': 'off',
+    },
+  },
+
   // Testing Library rules
   {
     files: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
