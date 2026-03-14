@@ -9,6 +9,7 @@ import { FocusAwareStatusBar, Text, View } from '@/components/ui';
 
 import { useWhisperModels } from '@/lib/hooks/use-whisper-models';
 import { translate } from '@/lib/i18n';
+import { POC_USER_ID, useGetOrCreateThread, useMessages, useSendMessage } from './api';
 
 // eslint-disable-next-line max-lines-per-function
 export function IdeaScreen() {
@@ -23,14 +24,26 @@ export function IdeaScreen() {
 
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [threadId, setThreadId] = useState<string | null>(null);
   const realtimeRef = useRef<{ stop: () => Promise<void> } | null>(null);
+
+  const getOrCreateThread = useGetOrCreateThread();
+  const sendMessage = useSendMessage();
+  const messages = useMessages(threadId);
 
   useEffect(() => {
     initializeWhisperModel('base').catch(console.error);
   }, [initializeWhisperModel]);
 
+  useEffect(() => {
+    getOrCreateThread({ userId: POC_USER_ID })
+      .then(id => setThreadId(id))
+      .catch(console.error);
+  }, [getOrCreateThread]);
+
   const isBusy = isInitializingModel || isDownloading;
-  // const isReady = !!whisperContext && !isBusy;
 
   const statusText = (() => {
     if (isDownloading) {
@@ -39,6 +52,8 @@ export function IdeaScreen() {
     }
     if (isInitializingModel)
       return 'Initializing model…';
+    if (isSending)
+      return 'Thinking…';
     if (isListening)
       return 'Listening…';
     return translate('idea.subtitle');
@@ -54,11 +69,33 @@ export function IdeaScreen() {
     return result.granted;
   };
 
+  const handleStopAndSend = async (finalTranscript: string) => {
+    if (!threadId || !finalTranscript.trim())
+      return;
+
+    setIsSending(true);
+    setAgentError(null);
+    try {
+      await sendMessage({ threadId, content: finalTranscript.trim() });
+    }
+    catch (err) {
+      console.error('Agent error:', err);
+      setAgentError('Failed to get a response. Please try again.');
+    }
+    finally {
+      setIsSending(false);
+    }
+  };
+
   const toggleListening = async () => {
     if (isListening) {
       await realtimeRef.current?.stop();
       realtimeRef.current = null;
       setIsListening(false);
+      const finalTranscript = transcript;
+      if (finalTranscript.trim()) {
+        await handleStopAndSend(finalTranscript);
+      }
       return;
     }
 
@@ -70,6 +107,7 @@ export function IdeaScreen() {
       return;
 
     setTranscript('');
+    setAgentError(null);
     setIsListening(true);
 
     const options: TranscribeRealtimeOptions = {
@@ -100,6 +138,10 @@ export function IdeaScreen() {
     }
   };
 
+  const lastAssistantMessage = messages
+    ? [...messages].reverse().find(m => m.role === 'assistant')
+    : null;
+
   return (
     <View className="flex-1" style={{ backgroundColor: '#FCFAEA' }}>
       <FocusAwareStatusBar />
@@ -109,10 +151,10 @@ export function IdeaScreen() {
             onPress={toggleListening}
             activeOpacity={0.8}
             style={[styles.micWrapper, isListening && styles.micWrapperActive]}
-            disabled={isBusy}
+            disabled={isBusy || isSending}
           >
             <BlurView tint="light" intensity={80} style={styles.micButton}>
-              {isBusy
+              {isBusy || isSending
                 ? (
                     <ActivityIndicator size="large" color="#433831" />
                   )
@@ -135,7 +177,7 @@ export function IdeaScreen() {
 
           <Text
             className="mt-2 px-8 text-center text-base"
-            style={{ color: isListening ? '#E05A2B' : '#7D7D7D' }}
+            style={{ color: isListening || isSending ? '#E05A2B' : '#7D7D7D' }}
           >
             {statusText}
           </Text>
@@ -151,10 +193,39 @@ export function IdeaScreen() {
                   className="mb-2 text-xs font-semibold tracking-widest uppercase"
                   style={{ color: '#A08060' }}
                 >
-                  Transcript
+                  You said
                 </Text>
                 <Text className="text-base/6" style={{ color: '#433831' }}>
                   {transcript}
+                </Text>
+              </View>
+            )
+          : null}
+
+        {lastAssistantMessage
+          ? (
+              <View
+                className="mx-6 mt-3 rounded-2xl p-4"
+                style={{ backgroundColor: '#433831', borderWidth: 1, borderColor: '#2E2420' }}
+              >
+                <Text
+                  className="mb-2 text-xs font-semibold tracking-widest uppercase"
+                  style={{ color: '#A08060' }}
+                >
+                  Advisor
+                </Text>
+                <Text className="text-base/6" style={{ color: '#FCFAEA' }}>
+                  {lastAssistantMessage.content}
+                </Text>
+              </View>
+            )
+          : null}
+
+        {agentError
+          ? (
+              <View className="mx-6 mt-3 rounded-2xl p-4" style={{ backgroundColor: '#FDE8E8' }}>
+                <Text className="text-sm" style={{ color: '#9B2335' }}>
+                  {agentError}
                 </Text>
               </View>
             )

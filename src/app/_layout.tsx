@@ -1,6 +1,7 @@
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 
 import { ThemeProvider } from '@react-navigation/native';
+import { ConvexProvider, ConvexReactClient } from 'convex/react';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as React from 'react';
@@ -10,11 +11,14 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { useThemeConfig } from '@/components/ui/use-theme-config';
 import { hydrateAuth } from '@/features/auth/use-auth-store';
-
 import { APIProvider } from '@/lib/api';
+
 import { loadSelectedTheme } from '@/lib/hooks/use-selected-theme';
+import Env from '../../env';
 // Import  global CSS file
 import '../global.css';
+
+const convex = new ConvexReactClient(Env.EXPO_PUBLIC_CONVEX_URL);
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -53,16 +57,18 @@ function Providers({ children }: { children: React.ReactNode }) {
       // eslint-disable-next-line better-tailwindcss/no-unknown-classes
       className={theme.dark ? `dark` : undefined}
     >
-      <KeyboardProvider>
-        <ThemeProvider value={theme}>
-          <APIProvider>
-            <BottomSheetModalProvider>
-              {children}
-              <FlashMessage position="top" />
-            </BottomSheetModalProvider>
-          </APIProvider>
-        </ThemeProvider>
-      </KeyboardProvider>
+      <ConvexProvider client={convex}>
+        <KeyboardProvider>
+          <ThemeProvider value={theme}>
+            <APIProvider>
+              <BottomSheetModalProvider>
+                {children}
+                <FlashMessage position="top" />
+              </BottomSheetModalProvider>
+            </APIProvider>
+          </ThemeProvider>
+        </KeyboardProvider>
+      </ConvexProvider>
     </GestureHandlerRootView>
   );
 }
