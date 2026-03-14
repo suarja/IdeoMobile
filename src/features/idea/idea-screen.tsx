@@ -23,6 +23,7 @@ export function IdeaScreen() {
   } = useWhisperModels();
 
   const [isListening, setIsListening] = useState(false);
+  const [isPreview, setIsPreview] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [agentError, setAgentError] = useState<string | null>(null);
@@ -56,6 +57,8 @@ export function IdeaScreen() {
       return 'Thinking…';
     if (isListening)
       return 'Listening…';
+    if (isPreview)
+      return 'Review your message';
     return translate('idea.subtitle');
   })();
 
@@ -87,30 +90,41 @@ export function IdeaScreen() {
   //   }
   // };
 
+  const handleSend = async () => {
+    if (!threadId || !transcript.trim())
+      return;
+    setIsPreview(false);
+    setIsSending(true);
+    setAgentError(null);
+    try {
+      await sendMessage({ threadId, content: transcript.trim() });
+    }
+    catch (err) {
+      console.error('Agent error:', err);
+      setAgentError('Failed to get a response. Please try again.');
+    }
+    finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setTranscript('');
+    setIsPreview(false);
+    setAgentError(null);
+  };
+
   const toggleListening = async () => {
     if (isListening) {
       const finalTranscript = transcript;
       // Update UI immediately — before awaiting Whisper's stop (which can take 1-2s)
       setIsListening(false);
-      if (finalTranscript.trim()) {
-        setIsSending(true);
-        setAgentError(null);
-      }
       // Fire stop in background, don't block UI on it
       const stopPromise = realtimeRef.current?.stop() ?? Promise.resolve();
       realtimeRef.current = null;
       await stopPromise;
       if (finalTranscript.trim()) {
-        try {
-          await sendMessage({ threadId: threadId!, content: finalTranscript.trim() });
-        }
-        catch (err) {
-          console.error('Agent error:', err);
-          setAgentError('Failed to get a response. Please try again.');
-        }
-        finally {
-          setIsSending(false);
-        }
+        setIsPreview(true);
       }
       return;
     }
@@ -167,7 +181,7 @@ export function IdeaScreen() {
             onPress={toggleListening}
             activeOpacity={0.8}
             style={[styles.micWrapper, isListening && styles.micWrapperActive]}
-            disabled={isBusy || isSending}
+            disabled={isBusy || isSending || isPreview}
           >
             <BlurView tint="light" intensity={80} style={styles.micButton}>
               {isBusy || isSending
@@ -220,6 +234,32 @@ export function IdeaScreen() {
                     {transcript}
                   </Text>
                 </ScrollView>
+                {isPreview
+                  ? (
+                      <View className="mt-3 flex-row justify-end" style={{ gap: 8 }}>
+                        <TouchableOpacity
+                          onPress={handleCancel}
+                          style={styles.cancelButton}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="close" size={16} color="#A08060" />
+                          <Text className="text-sm font-medium" style={{ color: '#A08060' }}>
+                            Cancel
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={handleSend}
+                          style={styles.sendButton}
+                          activeOpacity={0.7}
+                        >
+                          <Text className="text-sm font-medium" style={{ color: '#FCFAEA' }}>
+                            Send
+                          </Text>
+                          <Ionicons name="arrow-up" size={16} color="#FCFAEA" />
+                        </TouchableOpacity>
+                      </View>
+                    )
+                  : null}
               </View>
             )
           : null}
@@ -286,5 +326,24 @@ const styles = StyleSheet.create({
   micWrapperActive: {
     borderColor: 'rgba(224, 90, 43, 0.4)',
     shadowColor: '#E05A2B',
+  },
+  cancelButton: {
+    alignItems: 'center',
+    borderColor: '#E8D88A',
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  sendButton: {
+    alignItems: 'center',
+    backgroundColor: '#433831',
+    borderRadius: 20,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
   },
 });
