@@ -43,6 +43,7 @@
     },
     "title": "إعدادات",
     "version": "إصدار",
+    "voice_model": "نموذج الصوت",
     "website": "موقع الكتروني"
   },
   "welcome": "test arabic"

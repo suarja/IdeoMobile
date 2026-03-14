@@ -15,6 +15,7 @@ import { LanguageItem } from './components/language-item';
 import { SettingsContainer } from './components/settings-container';
 import { SettingsItem } from './components/settings-item';
 import { ThemeItem } from './components/theme-item';
+import { WhisperModelSection } from './components/whisper-model-section';
 
 export function SettingsScreen() {
   const signOut = useAuth.use.signOut();
@@ -56,6 +57,8 @@ export function SettingsScreen() {
             <LanguageItem />
             <ThemeItem />
           </SettingsContainer>
+
+          <WhisperModelSection />
 
           <SettingsContainer title="settings.about">
             <SettingsItem

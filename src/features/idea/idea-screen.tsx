@@ -1,39 +1,177 @@
+import type { TranscribeRealtimeOptions } from 'whisper.rn/index.js';
 import { Ionicons } from '@expo/vector-icons';
+import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
 import { BlurView } from 'expo-blur';
-import { StyleSheet, TouchableOpacity } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
 import { FocusAwareStatusBar, Text, View } from '@/components/ui';
+
+import { useWhisperModels } from '@/lib/hooks/use-whisper-models';
 import { translate } from '@/lib/i18n';
 
+// eslint-disable-next-line max-lines-per-function
 export function IdeaScreen() {
+  const {
+    whisperContext,
+    isInitializingModel,
+    isDownloading,
+    currentModelId,
+    initializeWhisperModel,
+    getDownloadProgress,
+  } = useWhisperModels();
+
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const realtimeRef = useRef<{ stop: () => Promise<void> } | null>(null);
+
+  useEffect(() => {
+    initializeWhisperModel('base').catch(console.error);
+  }, [initializeWhisperModel]);
+
+  const isBusy = isInitializingModel || isDownloading;
+  // const isReady = !!whisperContext && !isBusy;
+
+  const statusText = (() => {
+    if (isDownloading) {
+      const pct = Math.round((getDownloadProgress(currentModelId ?? 'base')) * 100);
+      return `Downloading model… ${pct}%`;
+    }
+    if (isInitializingModel)
+      return 'Initializing model…';
+    if (isListening)
+      return 'Listening…';
+    return translate('idea.subtitle');
+  })();
+
+  const ensurePermission = async (): Promise<boolean> => {
+    const status = await getRecordingPermissionsAsync();
+    if (status.granted)
+      return true;
+    if (!status.canAskAgain)
+      return false;
+    const result = await requestRecordingPermissionsAsync();
+    return result.granted;
+  };
+
+  const toggleListening = async () => {
+    if (isListening) {
+      await realtimeRef.current?.stop();
+      realtimeRef.current = null;
+      setIsListening(false);
+      return;
+    }
+
+    if (!whisperContext)
+      return;
+
+    const hasPermission = await ensurePermission();
+    if (!hasPermission)
+      return;
+
+    setTranscript('');
+    setIsListening(true);
+
+    const options: TranscribeRealtimeOptions = {
+      realtimeAudioSec: 300,
+      realtimeAudioSliceSec: 25,
+      realtimeAudioMinSec: 1,
+      audioSessionOnStartIos: {
+        category: 'PlayAndRecord' as any,
+        options: ['DefaultToSpeaker'] as any,
+        mode: 'Default' as any,
+      },
+      audioSessionOnStopIos: 'restore',
+    };
+
+    try {
+      const { stop, subscribe } = await whisperContext.transcribeRealtime(options);
+      realtimeRef.current = { stop };
+
+      subscribe((event: any) => {
+        if (event.data?.result) {
+          setTranscript(event.data.result.trim());
+        }
+      });
+    }
+    catch (err) {
+      console.error('Realtime transcription failed:', err);
+      setIsListening(false);
+    }
+  };
+
   return (
-    <View
-      className="flex-1 items-center justify-center"
-      style={{ backgroundColor: '#FCFAEA' }}
-    >
+    <View className="flex-1" style={{ backgroundColor: '#FCFAEA' }}>
       <FocusAwareStatusBar />
-      <TouchableOpacity onPress={() => {}} activeOpacity={0.8} style={styles.micWrapper}>
-        <BlurView tint="light" intensity={80} style={styles.micButton}>
-          <Ionicons name="mic" size={48} color="#433831" />
-        </BlurView>
-      </TouchableOpacity>
-      <Text
-        className="mt-8 text-center text-2xl font-semibold"
-        style={{ color: '#433831' }}
-      >
-        {translate('idea.cta')}
-      </Text>
-      <Text
-        className="mt-2 px-8 text-center text-base"
-        style={{ color: '#7D7D7D' }}
-      >
-        {translate('idea.subtitle')}
-      </Text>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View className="flex-1 items-center" style={styles.hero}>
+          <TouchableOpacity
+            onPress={toggleListening}
+            activeOpacity={0.8}
+            style={[styles.micWrapper, isListening && styles.micWrapperActive]}
+            disabled={isBusy}
+          >
+            <BlurView tint="light" intensity={80} style={styles.micButton}>
+              {isBusy
+                ? (
+                    <ActivityIndicator size="large" color="#433831" />
+                  )
+                : (
+                    <Ionicons
+                      name={isListening ? 'stop' : 'mic'}
+                      size={48}
+                      color={isListening ? '#E05A2B' : '#433831'}
+                    />
+                  )}
+            </BlurView>
+          </TouchableOpacity>
+
+          <Text
+            className="mt-8 text-center text-2xl font-semibold"
+            style={{ color: '#433831' }}
+          >
+            {translate('idea.cta')}
+          </Text>
+
+          <Text
+            className="mt-2 px-8 text-center text-base"
+            style={{ color: isListening ? '#E05A2B' : '#7D7D7D' }}
+          >
+            {statusText}
+          </Text>
+        </View>
+
+        {transcript
+          ? (
+              <View
+                className="mx-6 mt-4 rounded-2xl p-4"
+                style={{ backgroundColor: '#FDF4CD', borderWidth: 1, borderColor: '#E8D88A' }}
+              >
+                <Text
+                  className="mb-2 text-xs font-semibold tracking-widest uppercase"
+                  style={{ color: '#A08060' }}
+                >
+                  Transcript
+                </Text>
+                <Text className="text-base/6" style={{ color: '#433831' }}>
+                  {transcript}
+                </Text>
+              </View>
+            )
+          : null}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  content: {
+    paddingBottom: 48,
+    paddingTop: 80,
+  },
+  hero: {
+    paddingHorizontal: 24,
+  },
   micButton: {
     alignItems: 'center',
     borderRadius: 60,
@@ -51,5 +189,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
+  },
+  micWrapperActive: {
+    borderColor: 'rgba(224, 90, 43, 0.4)',
+    shadowColor: '#E05A2B',
   },
 });

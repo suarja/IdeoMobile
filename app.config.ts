@@ -47,6 +47,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundleIdentifier: Env.EXPO_PUBLIC_BUNDLE_ID,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      NSMicrophoneUsageDescription:
+        'Ideo uses the microphone to record your voice standup sessions.',
     },
   },
   experiments: {
@@ -64,6 +66,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundler: 'metro',
   },
   plugins: [
+
+    [
+      'expo-audio',
+      {
+        microphonePermission: 'Allow $(PRODUCT_NAME) to access your microphone.',
+        enableBackgroundPlayback: true,
+        enableBackgroundRecording: false,
+      },
+    ],
     [
       'expo-splash-screen',
       {

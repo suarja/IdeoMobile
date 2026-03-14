@@ -43,6 +43,7 @@
     },
     "title": "Settings",
     "version": "Version",
+    "voice_model": "Voice Model",
     "website": "Website"
   },
   "welcome": "Welcome to obytes app site"
