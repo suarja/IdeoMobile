@@ -8,7 +8,10 @@
   },
   "idea": {
     "cta": "Talk about your idea",
-    "subtitle": "Press and describe what you want to build"
+    "empty_hint": "No idea yet.",
+    "empty_hint2": "Tap the mic to start.",
+    "subtitle": "Press and describe what you want to build",
+    "title_placeholder": "New idea…"
   },
   "onboarding": {
     "message": "Welcome to obytes app site"

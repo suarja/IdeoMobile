@@ -1,12 +1,11 @@
 import type { TranscribeRealtimeOptions } from 'whisper.rn/index.js';
 import { Ionicons } from '@expo/vector-icons';
 import { getRecordingPermissionsAsync, requestRecordingPermissionsAsync } from 'expo-audio';
-import { BlurView } from 'expo-blur';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, FocusAwareStatusBar, Text, View } from '@/components/ui';
-
 import { useWhisperModels } from '@/lib/hooks/use-whisper-models';
 import { translate } from '@/lib/i18n';
 import { POC_USER_ID, useGetOrCreateThread, useMessages, useSendMessage } from './api';
@@ -44,6 +43,7 @@ export function IdeaScreen() {
       .catch(console.error);
   }, [getOrCreateThread]);
 
+  const insets = useSafeAreaInsets();
   const isBusy = isInitializingModel || isDownloading;
 
   const statusText = (() => {
@@ -72,24 +72,6 @@ export function IdeaScreen() {
     return result.granted;
   };
 
-  // const handleStopAndSend = async (finalTranscript: string) => {
-  //   if (!threadId || !finalTranscript.trim())
-  //     return;
-
-  //   setIsSending(true);
-  //   setAgentError(null);
-  //   try {
-  //     await sendMessage({ threadId, content: finalTranscript.trim() });
-  //   }
-  //   catch (err) {
-  //     console.error('Agent error:', err);
-  //     setAgentError('Failed to get a response. Please try again.');
-  //   }
-  //   finally {
-  //     setIsSending(false);
-  //   }
-  // };
-
   const handleSend = async () => {
     if (!threadId || !transcript.trim())
       return;
@@ -117,9 +99,7 @@ export function IdeaScreen() {
   const toggleListening = async () => {
     if (isListening) {
       const finalTranscript = transcript;
-      // Update UI immediately — before awaiting Whisper's stop (which can take 1-2s)
       setIsListening(false);
-      // Fire stop in background, don't block UI on it
       const stopPromise = realtimeRef.current?.stop() ?? Promise.resolve();
       realtimeRef.current = null;
       await stopPromise;
@@ -155,7 +135,6 @@ export function IdeaScreen() {
     try {
       const { stop, subscribe } = await whisperContext.transcribeRealtime(options);
       realtimeRef.current = { stop };
-
       subscribe((event: any) => {
         if (event.data?.result) {
           setTranscript(event.data.result.trim());
@@ -172,160 +151,176 @@ export function IdeaScreen() {
     ? [...messages].reverse().find(m => m.role === 'assistant')
     : null;
 
+  const showEmpty = !transcript && !lastAssistantMessage && !isBusy;
+
   return (
     <View className="flex-1" style={{ backgroundColor: colors.brand.bg }}>
       <FocusAwareStatusBar />
+
+      {/* Fixed header */}
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <Text style={styles.headerTitle}>Ideo</Text>
+        <Ionicons name="share-outline" size={22} color={colors.brand.dark} style={{ opacity: 0.4 }} />
+      </View>
+
+      {/* Scrollable content */}
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View className="flex-1 items-center" style={styles.hero}>
-          <TouchableOpacity
-            onPress={toggleListening}
-            activeOpacity={0.8}
-            style={[styles.micWrapper, isListening && styles.micWrapperActive]}
-            disabled={isBusy || isSending || isPreview}
-          >
-            <BlurView tint="light" intensity={80} style={styles.micButton}>
-              {isBusy || isSending
-                ? (
-                    <ActivityIndicator size="large" color={colors.brand.dark} />
-                  )
-                : (
-                    <Ionicons
-                      name={isListening ? 'stop' : 'mic'}
-                      size={48}
-                      color={isListening ? colors.primary[700] : colors.brand.dark}
-                    />
-                  )}
-            </BlurView>
-          </TouchableOpacity>
+        <Text style={styles.ideaTitle}>{translate('idea.title_placeholder')}</Text>
 
-          <Text
-            className="mt-8 text-center text-2xl font-semibold"
-            style={{ color: colors.brand.dark }}
-          >
-            {translate('idea.cta')}
-          </Text>
-
-          <Text
-            className="mt-2 px-8 text-center text-base"
-            style={{ color: isListening || isSending ? colors.primary[700] : colors.brand.muted }}
-          >
-            {statusText}
-          </Text>
-        </View>
+        {showEmpty && (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyHint}>{translate('idea.empty_hint')}</Text>
+            <Text style={styles.emptyHint}>{translate('idea.empty_hint2')}</Text>
+            <Ionicons
+              name="chevron-down-outline"
+              size={28}
+              color={colors.brand.dark}
+              style={styles.arrowHint}
+            />
+          </View>
+        )}
 
         {transcript
           ? (
-              <View
-                className="mx-6 mt-4 rounded-2xl p-4"
-                style={{ backgroundColor: colors.brand.selected, borderWidth: 1, borderColor: colors.brand.border, maxHeight: 160 }}
-              >
+              <View style={styles.transcriptCard}>
+                <Text style={styles.cardLabel}>Vous avez dit</Text>
                 <Text
-                  className="mb-2 text-xs font-semibold tracking-widest uppercase"
-                  style={{ color: '#A08060' }}
+                  style={styles.transcriptText}
+                  numberOfLines={isListening ? 3 : undefined}
                 >
-                  You said
+                  {transcript}
                 </Text>
-                <ScrollView
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                  nestedScrollEnabled
-                >
-                  <Text className="text-base/6" style={{ color: colors.brand.dark }}>
-                    {transcript}
-                  </Text>
-                </ScrollView>
-                {isPreview
-                  ? (
-                      <View className="mt-3 flex-row justify-end" style={{ gap: 8 }}>
-                        <TouchableOpacity
-                          onPress={handleCancel}
-                          style={styles.cancelButton}
-                          activeOpacity={0.7}
-                        >
-                          <Ionicons name="close" size={16} color="#A08060" />
-                          <Text className="text-sm font-medium" style={{ color: '#A08060' }}>
-                            Cancel
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={handleSend}
-                          style={styles.sendButton}
-                          activeOpacity={0.7}
-                        >
-                          <Text className="text-sm font-medium" style={{ color: colors.brand.bg }}>
-                            Send
-                          </Text>
-                          <Ionicons name="arrow-up" size={16} color={colors.brand.bg} />
-                        </TouchableOpacity>
-                      </View>
-                    )
-                  : null}
+                {isPreview && (
+                  <View style={styles.previewActions}>
+                    <TouchableOpacity onPress={handleCancel} style={styles.cancelButton} activeOpacity={0.7}>
+                      <Ionicons name="close" size={16} color="#A08060" />
+                      <Text style={styles.cancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleSend} style={styles.sendButton} activeOpacity={0.7}>
+                      <Text style={styles.sendText}>Send</Text>
+                      <Ionicons name="arrow-up" size={16} color={colors.brand.bg} />
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             )
           : null}
 
         {lastAssistantMessage
           ? (
-              <View
-                className="mx-6 mt-3 rounded-2xl p-4"
-                style={{ backgroundColor: colors.brand.dark, borderWidth: 1, borderColor: '#2E2420' }}
-              >
-                <Text
-                  className="mb-2 text-xs font-semibold tracking-widest uppercase"
-                  style={{ color: '#A08060' }}
-                >
-                  Advisor
-                </Text>
-                <Text className="text-base/6" style={{ color: colors.brand.bg }}>
-                  {lastAssistantMessage.content}
-                </Text>
+              <View style={styles.agentCard}>
+                <Text style={styles.cardLabel}>Advisor</Text>
+                <Text style={styles.agentText}>{lastAssistantMessage.content}</Text>
               </View>
             )
           : null}
 
         {agentError
           ? (
-              <View className="mx-6 mt-3 rounded-2xl p-4" style={{ backgroundColor: '#FDE8E8' }}>
-                <Text className="text-sm" style={{ color: '#9B2335' }}>
-                  {agentError}
-                </Text>
+              <View style={styles.errorCard}>
+                <Text style={styles.errorText}>{agentError}</Text>
               </View>
             )
           : null}
       </ScrollView>
+
+      {/* Fixed bottom bar: status text + FAB mic */}
+      <View style={styles.bottomBar}>
+        <Text
+          style={[styles.statusText, (isListening || isSending) && styles.statusTextActive]}
+          numberOfLines={1}
+        >
+          {statusText}
+        </Text>
+        <TouchableOpacity
+          onPress={toggleListening}
+          activeOpacity={0.8}
+          style={[styles.fab, isListening && styles.fabActive]}
+          disabled={isBusy || isSending || isPreview}
+        >
+          {isBusy || isSending
+            ? (
+                <ActivityIndicator size="small" color={colors.brand.bg} />
+              )
+            : (
+                <Ionicons
+                  name={isListening ? 'stop' : 'mic'}
+                  size={24}
+                  color={colors.brand.bg}
+                />
+              )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    paddingBottom: 48,
-    paddingTop: 80,
+  header: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    paddingHorizontal: 24,
+    // paddingTop is set dynamically via insets
   },
-  hero: {
+  headerTitle: {
+    color: colors.brand.dark,
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  content: {
+    paddingBottom: 24,
     paddingHorizontal: 24,
   },
-  micButton: {
+  ideaTitle: {
+    color: '#A08060',
+    fontFamily: 'Georgia',
+    fontSize: 30,
+    fontStyle: 'italic',
+    letterSpacing: -0.5,
+    lineHeight: 40,
+    marginBottom: 20,
+  },
+  emptyState: {
     alignItems: 'center',
-    borderRadius: 60,
-    height: 120,
-    justifyContent: 'center',
-    overflow: 'hidden',
-    width: 120,
+    paddingTop: 80,
   },
-  micWrapper: {
-    borderColor: 'rgba(67, 56, 49, 0.15)',
-    borderRadius: 60,
+  emptyHint: {
+    color: '#A08060',
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  arrowHint: {
+    marginTop: 120,
+    opacity: 0.4,
+  },
+  transcriptCard: {
+    backgroundColor: colors.brand.selected,
+    borderColor: colors.brand.border,
+    borderRadius: 16,
     borderWidth: 1,
-    elevation: 4,
-    shadowColor: colors.brand.dark,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    marginTop: 16,
+    padding: 16,
   },
-  micWrapperActive: {
-    borderColor: 'rgba(229, 97, 0, 0.4)',
-    shadowColor: colors.primary[700],
+  cardLabel: {
+    color: '#A08060',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 2,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  transcriptText: {
+    color: colors.brand.dark,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  previewActions: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'flex-end',
+    marginTop: 12,
   },
   cancelButton: {
     alignItems: 'center',
@@ -337,6 +332,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
   },
+  cancelText: {
+    color: '#A08060',
+    fontSize: 14,
+    fontWeight: '500',
+  },
   sendButton: {
     alignItems: 'center',
     backgroundColor: colors.brand.dark,
@@ -345,5 +345,67 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 14,
     paddingVertical: 7,
+  },
+  sendText: {
+    color: colors.brand.bg,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  agentCard: {
+    backgroundColor: colors.brand.dark,
+    borderColor: '#2E2420',
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 12,
+    padding: 16,
+  },
+  agentText: {
+    color: colors.brand.bg,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  errorCard: {
+    backgroundColor: '#FDE8E8',
+    borderRadius: 16,
+    marginTop: 12,
+    padding: 16,
+  },
+  errorText: {
+    color: '#9B2335',
+    fontSize: 14,
+  },
+  bottomBar: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    paddingBottom: 16,
+    paddingHorizontal: 24,
+    paddingTop: 8,
+  },
+  statusText: {
+    color: colors.brand.muted,
+    flex: 1,
+    fontSize: 14,
+  },
+  statusTextActive: {
+    color: colors.primary[700],
+  },
+  fab: {
+    alignItems: 'center',
+    backgroundColor: colors.brand.dark,
+    borderColor: colors.brand.border,
+    borderRadius: 28,
+    borderWidth: 1,
+    elevation: 4,
+    height: 56,
+    justifyContent: 'center',
+    shadowColor: colors.brand.dark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    width: 56,
+  },
+  fabActive: {
+    backgroundColor: colors.primary[700],
+    borderColor: 'rgba(229, 97, 0, 0.4)',
   },
 });

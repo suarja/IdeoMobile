@@ -1,8 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Redirect, SplashScreen, Tabs } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 
-import colors from '@/components/ui/colors';
+import { MetalOrangeTabBar } from '@/components/metal-orange-tab-bar';
 import { useAuthStore as useAuth } from '@/features/auth/use-auth-store';
 import { useIsFirstTime } from '@/lib/hooks/use-is-first-time';
 
@@ -30,44 +29,12 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: colors.primary[600],
-        tabBarInactiveTintColor: colors.brand.dark,
-        tabBarStyle: {
-          backgroundColor: colors.brand.bg,
-          borderTopColor: colors.brand.border,
-          borderTopWidth: 1,
-        },
-        headerShown: false,
-      }}
+      tabBar={props => <MetalOrangeTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Idea',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'mic' : 'mic-outline'} size={24} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="focus"
-        options={{
-          title: 'Focus',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'flame' : 'flame-outline'} size={24} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={24} color={color} />
-          ),
-        }}
-      />
+      <Tabs.Screen name="index" />
+      <Tabs.Screen name="focus" />
+      <Tabs.Screen name="settings" />
     </Tabs>
   );
 }
