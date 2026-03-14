@@ -203,7 +203,7 @@ export function IdeaScreen() {
           ? (
               <View
                 className="mx-6 mt-4 rounded-2xl p-4"
-                style={{ backgroundColor: '#FDF4CD', borderWidth: 1, borderColor: '#E8D88A' }}
+                style={{ backgroundColor: '#FDF4CD', borderWidth: 1, borderColor: '#E8D88A', maxHeight: 160 }}
               >
                 <Text
                   className="mb-2 text-xs font-semibold tracking-widest uppercase"
@@ -211,9 +211,15 @@ export function IdeaScreen() {
                 >
                   You said
                 </Text>
-                <Text className="text-base/6" style={{ color: '#433831' }}>
-                  {transcript}
-                </Text>
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  nestedScrollEnabled
+                >
+                  <Text className="text-base/6" style={{ color: '#433831' }}>
+                    {transcript}
+                  </Text>
+                </ScrollView>
               </View>
             )
           : null}
