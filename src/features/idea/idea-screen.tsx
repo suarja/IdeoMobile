@@ -69,32 +69,48 @@ export function IdeaScreen() {
     return result.granted;
   };
 
-  const handleStopAndSend = async (finalTranscript: string) => {
-    if (!threadId || !finalTranscript.trim())
-      return;
+  // const handleStopAndSend = async (finalTranscript: string) => {
+  //   if (!threadId || !finalTranscript.trim())
+  //     return;
 
-    setIsSending(true);
-    setAgentError(null);
-    try {
-      await sendMessage({ threadId, content: finalTranscript.trim() });
-    }
-    catch (err) {
-      console.error('Agent error:', err);
-      setAgentError('Failed to get a response. Please try again.');
-    }
-    finally {
-      setIsSending(false);
-    }
-  };
+  //   setIsSending(true);
+  //   setAgentError(null);
+  //   try {
+  //     await sendMessage({ threadId, content: finalTranscript.trim() });
+  //   }
+  //   catch (err) {
+  //     console.error('Agent error:', err);
+  //     setAgentError('Failed to get a response. Please try again.');
+  //   }
+  //   finally {
+  //     setIsSending(false);
+  //   }
+  // };
 
   const toggleListening = async () => {
     if (isListening) {
-      await realtimeRef.current?.stop();
-      realtimeRef.current = null;
-      setIsListening(false);
       const finalTranscript = transcript;
+      // Update UI immediately — before awaiting Whisper's stop (which can take 1-2s)
+      setIsListening(false);
       if (finalTranscript.trim()) {
-        await handleStopAndSend(finalTranscript);
+        setIsSending(true);
+        setAgentError(null);
+      }
+      // Fire stop in background, don't block UI on it
+      const stopPromise = realtimeRef.current?.stop() ?? Promise.resolve();
+      realtimeRef.current = null;
+      await stopPromise;
+      if (finalTranscript.trim()) {
+        try {
+          await sendMessage({ threadId: threadId!, content: finalTranscript.trim() });
+        }
+        catch (err) {
+          console.error('Agent error:', err);
+          setAgentError('Failed to get a response. Please try again.');
+        }
+        finally {
+          setIsSending(false);
+        }
       }
       return;
     }
