@@ -70,6 +70,23 @@ Jest with `jest-expo` preset. Test helper in `src/lib/test-utils.tsx` provides `
 
 i18next with `src/translations/en.json` as reference. All translation files must have identical sorted keys (ESLint enforced). Add translation keys before using them in components.
 
+## Backend (Convex)
+
+The POC uses **Convex** as the backend (real-time database + serverless functions + agent orchestration).
+
+**Source of truth for Convex best practices:** `docs/agents/convex_rules.txt` — always consult this file before writing any Convex code.
+
+Key points:
+- All Convex functions live in the `convex/` folder with file-based routing.
+- Schema is defined in `convex/schema.ts`.
+- Use `query`/`mutation`/`action` for public functions, `internalQuery`/`internalMutation`/`internalAction` for private ones.
+- Always include argument validators (`v.*`) on every function.
+- Never use `ctx.db` inside actions. Never accept userId as an argument — derive from `ctx.auth.getUserIdentity()`.
+- Use `@convex-dev/agent` for the AI agent layer (see `convex/agents/`).
+- Convex config is in `convex/convex.config.ts`.
+
+For the mobile client, use `convex/react` with `ConvexProvider` (or `ConvexProviderWithAuth` when auth is needed).
+
 ## Key Rules
 
 - **Imports**: Always `@/` prefix for src, `@env` for env vars. Never relative imports.

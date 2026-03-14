@@ -79,3 +79,20 @@ Jest with `jest-expo` preset. Test utilities in `src/lib/test-utils.tsx` provide
 - **Environment variables**: Must be prefixed with `EXPO_PUBLIC_*` for app access. Defined and validated with Zod in `env.ts`. The `.env` file sets defaults; environment-specific config is selected via `EXPO_PUBLIC_APP_ENV`.
 - **Commits**: Follow [Conventional Commits](https://www.conventionalcommits.org/) (enforced by commitlint). Direct commits to `main`/`master` are blocked by the pre-commit hook.
 - **Pre-commit**: Runs `type-check` and `lint-staged` (ESLint --fix on staged files).
+
+## Backend (Convex)
+
+The POC uses **Convex** as the backend (real-time database + serverless functions + AI agent orchestration via `@convex-dev/agent`).
+
+**Source of truth for all Convex rules:** `docs/agents/convex_rules.txt` — always read this file before writing any code in `convex/`.
+
+Key rules summary:
+- All Convex functions live in `convex/` with file-based routing (`api.module.function` / `internal.module.function`).
+- Schema must be defined in `convex/schema.ts`. Always name indexes after their fields (e.g. `by_field1_and_field2`).
+- Always include argument validators (`v.*`) on every function — no exceptions.
+- Use `query`/`mutation`/`action` for public functions; `internalQuery`/`internalMutation`/`internalAction` for private ones.
+- Never use `ctx.db` inside actions. Never accept `userId` as an argument — always derive identity via `ctx.auth.getUserIdentity()`.
+- Add `"use node";` only to action files that need Node.js built-ins; never mix with queries/mutations in the same file.
+- Do not use `.filter()` on queries — define indexes and use `.withIndex()` instead.
+- Do not use `.collect()` for unbounded results — use `.take(n)` or paginate.
+- Convex config: `convex/convex.config.ts`. Agent layer: `convex/agents/`.
