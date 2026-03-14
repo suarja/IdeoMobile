@@ -1,7 +1,7 @@
 import { StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
-import { FocusAwareStatusBar, ScrollView, Text, View } from '@/components/ui';
+import { colors, FocusAwareStatusBar, ScrollView, Text, View } from '@/components/ui';
 
 const MOCK_DATA = {
   streak: 7,
@@ -74,21 +74,21 @@ function GaugeStats() {
         value={MOCK_DATA.streak}
         max={MOCK_DATA.streakMax}
         label="Streak"
-        color="#FF6C00"
+        color={colors.primary[600]}
         displayValue={String(MOCK_DATA.streak)}
       />
       <CircularGauge
         value={MOCK_DATA.progress}
         max={1}
         label="Today"
-        color="#433831"
+        color={colors.brand.dark}
         displayValue="60%"
       />
       <CircularGauge
         value={MOCK_DATA.points}
         max={MOCK_DATA.pointsMax}
         label="Points"
-        color="#FF6C00"
+        color={colors.primary[600]}
         displayValue={String(MOCK_DATA.points)}
       />
     </View>
@@ -97,11 +97,11 @@ function GaugeStats() {
 
 export function FocusScreen() {
   return (
-    <View className="flex-1" style={{ backgroundColor: '#FCFAEA' }}>
+    <View className="flex-1" style={{ backgroundColor: colors.brand.bg }}>
       <FocusAwareStatusBar />
       <ScrollView>
         <View className="px-4 pt-16 pb-8">
-          <Text className="mb-6 text-2xl font-bold" style={{ color: '#433831' }}>
+          <Text className="mb-6 text-2xl font-bold" style={{ color: colors.brand.dark }}>
             Focus
           </Text>
 
@@ -110,33 +110,33 @@ export function FocusScreen() {
           {/* Daily objective */}
           <View
             className="mb-6 rounded-xl p-4"
-            style={{ backgroundColor: '#FDF4CD', borderWidth: 1, borderColor: '#E8D88A' }}
+            style={{ backgroundColor: colors.brand.selected, borderWidth: 1, borderColor: colors.brand.border }}
           >
             <Text
               className="mb-1 text-xs font-semibold tracking-wider uppercase"
-              style={{ color: '#7D7D7D' }}
+              style={{ color: colors.brand.muted }}
             >
               Today's objective
             </Text>
-            <Text className="text-base font-medium" style={{ color: '#433831' }}>
+            <Text className="text-base font-medium" style={{ color: colors.brand.dark }}>
               Refine your app's core value proposition
             </Text>
           </View>
 
           {/* Recent interactions */}
-          <Text className="mb-3 text-lg font-semibold" style={{ color: '#433831' }}>
+          <Text className="mb-3 text-lg font-semibold" style={{ color: colors.brand.dark }}>
             Recent interactions
           </Text>
           {MOCK_INTERACTIONS.map(item => (
             <View
               key={item.id}
               className="flex-row items-center justify-between border-b py-3"
-              style={{ borderColor: '#E8D88A' }}
+              style={{ borderColor: colors.brand.border }}
             >
-              <Text className="flex-1 pr-4 text-sm" style={{ color: '#433831' }}>
+              <Text className="flex-1 pr-4 text-sm" style={{ color: colors.brand.dark }}>
                 {item.label}
               </Text>
-              <Text className="text-xs" style={{ color: '#7D7D7D' }}>
+              <Text className="text-xs" style={{ color: colors.brand.muted }}>
                 {item.time}
               </Text>
             </View>
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     top: 0,
   },
   gaugeLabel: {
-    color: '#7D7D7D',
+    color: colors.brand.muted,
     fontSize: 12,
     marginTop: 4,
   },

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { ActivityIndicator, TouchableOpacity, View } from 'react-native';
 
-import { Text } from '@/components/ui';
+import { colors, Text } from '@/components/ui';
 import { useWhisperModels, WHISPER_MODELS } from '@/lib/hooks/use-whisper-models';
 
 import { SettingsContainer } from './settings-container';
@@ -56,26 +56,26 @@ export function WhisperModelSection() {
                 {isActive && (
                   <View
                     className="rounded-full px-2 py-0.5"
-                    style={{ backgroundColor: '#433831' }}
+                    style={{ backgroundColor: colors.brand.dark }}
                   >
-                    <Text className="text-xs font-semibold" style={{ color: '#FCFAEA' }}>
+                    <Text className="text-xs font-semibold" style={{ color: colors.brand.bg }}>
                       Active
                     </Text>
                   </View>
                 )}
-                <Text className="text-sm font-semibold" style={{ color: '#433831' }}>
+                <Text className="text-sm font-semibold" style={{ color: colors.brand.dark }}>
                   {model.label}
                 </Text>
               </View>
-              <Text className="mt-0.5 text-xs" style={{ color: '#7D7D7D' }}>
+              <Text className="mt-0.5 text-xs" style={{ color: colors.brand.muted }}>
                 {model.capabilities.multilingual ? 'Multilingual' : 'English only'}
                 {fileInfo?.size ? `  ·  ${formatBytes(fileInfo.size)}` : ''}
               </Text>
               {isThisDownloading && (
-                <View className="mt-1 h-1 w-full overflow-hidden rounded-full" style={{ backgroundColor: '#E8D88A' }}>
+                <View className="mt-1 h-1 w-full overflow-hidden rounded-full" style={{ backgroundColor: colors.brand.border }}>
                   <View
                     className="h-1 rounded-full"
-                    style={{ width: `${Math.round(progress * 100)}%`, backgroundColor: '#433831' }}
+                    style={{ width: `${Math.round(progress * 100)}%`, backgroundColor: colors.brand.dark }}
                   />
                 </View>
               )}
@@ -85,7 +85,7 @@ export function WhisperModelSection() {
             <View className="flex-row items-center gap-3">
               {isThisDownloading
                 ? (
-                    <ActivityIndicator size="small" color="#433831" />
+                    <ActivityIndicator size="small" color={colors.brand.dark} />
                   )
                 : downloaded
                   ? (
@@ -95,7 +95,7 @@ export function WhisperModelSection() {
                             onPress={() => initializeWhisperModel(model.id).catch(console.error)}
                             disabled={isBusy}
                           >
-                            <Text className="text-sm font-medium" style={{ color: '#433831', opacity: isBusy ? 0.4 : 1 }}>
+                            <Text className="text-sm font-medium" style={{ color: colors.brand.dark, opacity: isBusy ? 0.4 : 1 }}>
                               Use
                             </Text>
                           </TouchableOpacity>
@@ -104,7 +104,7 @@ export function WhisperModelSection() {
                           onPress={() => deleteModel(model.id).catch(console.error)}
                           disabled={isBusy}
                         >
-                          <Text className="text-sm font-medium" style={{ color: '#C0392B', opacity: isBusy ? 0.4 : 1 }}>
+                          <Text className="text-sm font-medium" style={{ color: colors.danger[600], opacity: isBusy ? 0.4 : 1 }}>
                             Delete
                           </Text>
                         </TouchableOpacity>
@@ -115,7 +115,7 @@ export function WhisperModelSection() {
                         onPress={() => initializeWhisperModel(model.id).catch(console.error)}
                         disabled={isBusy}
                       >
-                        <Text className="text-sm font-medium" style={{ color: '#433831', opacity: isBusy ? 0.4 : 1 }}>
+                        <Text className="text-sm font-medium" style={{ color: colors.brand.dark, opacity: isBusy ? 0.4 : 1 }}>
                           Download
                         </Text>
                       </TouchableOpacity>

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Redirect, SplashScreen, Tabs } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 
+import colors from '@/components/ui/colors';
 import { useAuthStore as useAuth } from '@/features/auth/use-auth-store';
 import { useIsFirstTime } from '@/lib/hooks/use-is-first-time';
 
@@ -30,11 +31,11 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#FF6C00',
-        tabBarInactiveTintColor: '#433831',
+        tabBarActiveTintColor: colors.primary[600],
+        tabBarInactiveTintColor: colors.brand.dark,
         tabBarStyle: {
-          backgroundColor: '#FCFAEA',
-          borderTopColor: '#E8D88A',
+          backgroundColor: colors.brand.bg,
+          borderTopColor: colors.brand.border,
           borderTopWidth: 1,
         },
         headerShown: false,

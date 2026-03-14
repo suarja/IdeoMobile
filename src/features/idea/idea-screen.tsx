@@ -5,7 +5,7 @@ import { BlurView } from 'expo-blur';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
-import { FocusAwareStatusBar, Text, View } from '@/components/ui';
+import { colors, FocusAwareStatusBar, Text, View } from '@/components/ui';
 
 import { useWhisperModels } from '@/lib/hooks/use-whisper-models';
 import { translate } from '@/lib/i18n';
@@ -173,7 +173,7 @@ export function IdeaScreen() {
     : null;
 
   return (
-    <View className="flex-1" style={{ backgroundColor: '#FCFAEA' }}>
+    <View className="flex-1" style={{ backgroundColor: colors.brand.bg }}>
       <FocusAwareStatusBar />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View className="flex-1 items-center" style={styles.hero}>
@@ -186,13 +186,13 @@ export function IdeaScreen() {
             <BlurView tint="light" intensity={80} style={styles.micButton}>
               {isBusy || isSending
                 ? (
-                    <ActivityIndicator size="large" color="#433831" />
+                    <ActivityIndicator size="large" color={colors.brand.dark} />
                   )
                 : (
                     <Ionicons
                       name={isListening ? 'stop' : 'mic'}
                       size={48}
-                      color={isListening ? '#E05A2B' : '#433831'}
+                      color={isListening ? colors.primary[700] : colors.brand.dark}
                     />
                   )}
             </BlurView>
@@ -200,14 +200,14 @@ export function IdeaScreen() {
 
           <Text
             className="mt-8 text-center text-2xl font-semibold"
-            style={{ color: '#433831' }}
+            style={{ color: colors.brand.dark }}
           >
             {translate('idea.cta')}
           </Text>
 
           <Text
             className="mt-2 px-8 text-center text-base"
-            style={{ color: isListening || isSending ? '#E05A2B' : '#7D7D7D' }}
+            style={{ color: isListening || isSending ? colors.primary[700] : colors.brand.muted }}
           >
             {statusText}
           </Text>
@@ -217,7 +217,7 @@ export function IdeaScreen() {
           ? (
               <View
                 className="mx-6 mt-4 rounded-2xl p-4"
-                style={{ backgroundColor: '#FDF4CD', borderWidth: 1, borderColor: '#E8D88A', maxHeight: 160 }}
+                style={{ backgroundColor: colors.brand.selected, borderWidth: 1, borderColor: colors.brand.border, maxHeight: 160 }}
               >
                 <Text
                   className="mb-2 text-xs font-semibold tracking-widest uppercase"
@@ -230,7 +230,7 @@ export function IdeaScreen() {
                   keyboardShouldPersistTaps="handled"
                   nestedScrollEnabled
                 >
-                  <Text className="text-base/6" style={{ color: '#433831' }}>
+                  <Text className="text-base/6" style={{ color: colors.brand.dark }}>
                     {transcript}
                   </Text>
                 </ScrollView>
@@ -252,10 +252,10 @@ export function IdeaScreen() {
                           style={styles.sendButton}
                           activeOpacity={0.7}
                         >
-                          <Text className="text-sm font-medium" style={{ color: '#FCFAEA' }}>
+                          <Text className="text-sm font-medium" style={{ color: colors.brand.bg }}>
                             Send
                           </Text>
-                          <Ionicons name="arrow-up" size={16} color="#FCFAEA" />
+                          <Ionicons name="arrow-up" size={16} color={colors.brand.bg} />
                         </TouchableOpacity>
                       </View>
                     )
@@ -268,7 +268,7 @@ export function IdeaScreen() {
           ? (
               <View
                 className="mx-6 mt-3 rounded-2xl p-4"
-                style={{ backgroundColor: '#433831', borderWidth: 1, borderColor: '#2E2420' }}
+                style={{ backgroundColor: colors.brand.dark, borderWidth: 1, borderColor: '#2E2420' }}
               >
                 <Text
                   className="mb-2 text-xs font-semibold tracking-widest uppercase"
@@ -276,7 +276,7 @@ export function IdeaScreen() {
                 >
                   Advisor
                 </Text>
-                <Text className="text-base/6" style={{ color: '#FCFAEA' }}>
+                <Text className="text-base/6" style={{ color: colors.brand.bg }}>
                   {lastAssistantMessage.content}
                 </Text>
               </View>
@@ -318,18 +318,18 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     borderWidth: 1,
     elevation: 4,
-    shadowColor: '#433831',
+    shadowColor: colors.brand.dark,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
   },
   micWrapperActive: {
-    borderColor: 'rgba(224, 90, 43, 0.4)',
-    shadowColor: '#E05A2B',
+    borderColor: 'rgba(229, 97, 0, 0.4)',
+    shadowColor: colors.primary[700],
   },
   cancelButton: {
     alignItems: 'center',
-    borderColor: '#E8D88A',
+    borderColor: colors.brand.border,
     borderRadius: 20,
     borderWidth: 1,
     flexDirection: 'row',
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     alignItems: 'center',
-    backgroundColor: '#433831',
+    backgroundColor: colors.brand.dark,
     borderRadius: 20,
     flexDirection: 'row',
     gap: 4,

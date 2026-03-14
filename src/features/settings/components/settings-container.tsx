@@ -1,7 +1,7 @@
 import type { TxKeyPath } from '@/lib/i18n';
 
 import * as React from 'react';
-import { Text, View } from '@/components/ui';
+import { colors, Text, View } from '@/components/ui';
 
 type Props = {
   children: React.ReactNode;
@@ -11,8 +11,21 @@ type Props = {
 export function SettingsContainer({ children, title }: Props) {
   return (
     <>
-      {title && <Text className="pt-4 pb-2 text-lg" tx={title} />}
-      <View className="rounded-md border border-neutral-200 dark:border-neutral-700 dark:bg-neutral-800">
+      {title && (
+        <Text
+          className="pt-4 pb-2 text-lg font-semibold"
+          style={{ color: colors.brand.dark }}
+          tx={title}
+        />
+      )}
+      <View
+        className="rounded-xl"
+        style={{
+          backgroundColor: colors.brand.card,
+          borderWidth: 1,
+          borderColor: colors.brand.border,
+        }}
+      >
         {children}
       </View>
     </>

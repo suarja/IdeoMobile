@@ -1,5 +1,4 @@
 import Env from 'env';
-import { useUniwind } from 'uniwind';
 
 import {
   colors,
@@ -14,40 +13,37 @@ import { translate } from '@/lib/i18n';
 import { LanguageItem } from './components/language-item';
 import { SettingsContainer } from './components/settings-container';
 import { SettingsItem } from './components/settings-item';
-import { ThemeItem } from './components/theme-item';
 import { WhisperModelSection } from './components/whisper-model-section';
 
 export function SettingsScreen() {
   const signOut = useAuth.use.signOut();
-  const { theme } = useUniwind();
-  const iconColor
-    = theme === 'dark' ? colors.neutral[400] : colors.neutral[500];
+  const iconColor = colors.brand.muted;
   return (
     <>
       <FocusAwareStatusBar />
 
-      <ScrollView>
+      <ScrollView style={{ backgroundColor: colors.brand.bg }}>
         <View className="flex-1 px-4">
           {/* Profile header */}
           <View className="items-center pt-16 pb-8">
             <View
               className="mb-3 size-20 items-center justify-center rounded-full"
-              style={{ backgroundColor: '#433831' }}
+              style={{ backgroundColor: colors.brand.dark }}
             >
-              <Text className="text-3xl" style={{ color: '#FCFAEA' }}>V</Text>
+              <Text className="text-3xl" style={{ color: colors.brand.bg }}>V</Text>
             </View>
-            <Text className="text-lg font-semibold" style={{ color: '#433831' }}>
+            <Text className="text-lg font-semibold" style={{ color: colors.brand.dark }}>
               {translate('profile.username')}
             </Text>
             <View
               className="mt-1 rounded-full px-3 py-0.5"
               style={{
-                backgroundColor: '#FDF4CD',
+                backgroundColor: colors.brand.selected,
                 borderWidth: 1,
-                borderColor: '#E8D88A',
+                borderColor: colors.brand.border,
               }}
             >
-              <Text className="text-xs font-medium" style={{ color: '#433831' }}>
+              <Text className="text-xs font-medium" style={{ color: colors.brand.dark }}>
                 {translate('profile.free_plan')}
               </Text>
             </View>
@@ -55,7 +51,6 @@ export function SettingsScreen() {
 
           <SettingsContainer title="settings.generale">
             <LanguageItem />
-            <ThemeItem />
           </SettingsContainer>
 
           <WhisperModelSection />
