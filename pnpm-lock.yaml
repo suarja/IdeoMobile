@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@ai-sdk/anthropic':
+        specifier: 2.0.70
+        version: 2.0.70(zod@4.3.5)
       '@ai-sdk/openai':
         specifier: ^2.0.99
         version: 2.0.99(zod@4.3.5)
@@ -289,6 +292,12 @@ packages:
     peerDependenciesMeta:
       graphql:
         optional: true
+
+  '@ai-sdk/anthropic@2.0.70':
+    resolution: {integrity: sha512-W3WjQlb0Ho+CVAQUvb8Rtk3hGS3Jlgy79ihY2H0yj2k4yU8XuxpQw0Oz+7JQsB47j+jlHhk7nUXtxhAeRg3S3Q==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
 
   '@ai-sdk/gateway@2.0.58':
     resolution: {integrity: sha512-HLPfF5k/rUre8fBMSJnJP6UL7ONx+W/BksTGdand0/Jkq5nCVlwmoUC4URc8PtZ+UtnMP6waQlD4b9/rPOHk7A==}
@@ -8510,6 +8519,12 @@ packages:
 snapshots:
 
   '@0no-co/graphql.web@1.2.0': {}
+
+  '@ai-sdk/anthropic@2.0.70(zod@4.3.5)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.1
+      '@ai-sdk/provider-utils': 3.0.22(zod@4.3.5)
+      zod: 4.3.5
 
   '@ai-sdk/gateway@2.0.58(zod@4.3.5)':
     dependencies:

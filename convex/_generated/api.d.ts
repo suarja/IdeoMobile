@@ -9,6 +9,7 @@
  */
 
 import type * as agents_testAgent from "../agents/testAgent.js";
+import type * as playground from "../playground.js";
 
 import type {
   ApiFromModules,
@@ -18,6 +19,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "agents/testAgent": typeof agents_testAgent;
+  playground: typeof playground;
 }>;
 
 /**
