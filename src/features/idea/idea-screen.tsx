@@ -5,9 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, FocusAwareStatusBar, Text, View } from '@/components/ui';
 
-import { useWhisperModels, WHISPER_MODELS } from '@/lib/hooks/use-whisper-models';
+import { useWhisperModels } from '@/lib/hooks/use-whisper-models';
 import { translate } from '@/lib/i18n';
-import { storage } from '@/lib/storage';
 
 import { MicBottomBar } from './components/mic-bottom-bar';
 import { TranscriptBox } from './components/transcript-box';
@@ -41,15 +40,7 @@ export function IdeaScreen() {
     = useWhisperModels();
 
   useEffect(() => {
-    const saved = storage.getString('whisper_selected_model');
-    const modelId = (saved && WHISPER_MODELS.some(m => m.id === saved)) ? saved : 'base';
-    initializeWhisperModel(modelId).catch((err) => {
-      console.error('Model init failed, falling back to base:', err);
-      if (modelId !== 'base') {
-        storage.delete('whisper_selected_model');
-        initializeWhisperModel('base').catch(console.error);
-      }
-    });
+    initializeWhisperModel('base').catch(console.error);
   }, [initializeWhisperModel]);
 
   const session = useIdeaSession();

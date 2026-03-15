@@ -100,6 +100,14 @@ For the mobile client, use `convex/react` with `ConvexProvider` (or `ConvexProvi
 - **Commits**: Conventional Commits format (enforced by commitlint). Direct commits to `main`/`master` are blocked.
 - **Pre-commit hook**: Runs `type-check` + `lint-staged` automatically.
 
+## Bugs Documentés
+
+Des incidents résolus sont consignés dans `docs/bugs/` pour éviter les régressions futures. Consulter ces fichiers avant de toucher aux systèmes concernés.
+
+| Fichier | Système | Résumé |
+|---------|---------|--------|
+| [`docs/bugs/whisper-realtime-capturing-bug.md`](docs/bugs/whisper-realtime-capturing-bug.md) | `use-voice-recording.ts` / Whisper STT | Ne jamais utiliser `Promise.race()` avec timeout pour stopper Whisper — laisse le contexte en état zombie qui bloque toute nouvelle capture |
+
 ## Template Docs
 
 - [Rules & Conventions](https://starter.obytes.com/getting-started/rules-and-conventions/)

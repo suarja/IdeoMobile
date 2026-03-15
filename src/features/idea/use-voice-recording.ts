@@ -19,18 +19,18 @@ type Options = {
   onRecordingComplete: () => void;
 };
 
+// eslint-disable-next-line max-lines-per-function
 export function useVoiceRecording({ whisperContext, onRecordingComplete }: Options): VoiceRecording {
   const [isListening, setIsListening] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const [transcript, setTranscript] = useState('');
 
-  // Holds the stop handle from whisperContext.transcribeRealtime.
-  // Stored in a ref (not state) to avoid re-renders on assignment.
+  // stop handle from whisperContext.transcribeRealtime — null when not capturing
   const realtimeRef = useRef<{ stop: () => Promise<void> } | null>(null);
+  // Tracks whether Whisper has actually started capture (set true after transcribeRealtime resolves)
+  const isCapturingRef = useRef(false);
   const transcriptScrollRef = useRef<ScrollView>(null);
 
-  // Auto-scroll to bottom during live transcription only.
-  // Does not interfere with the preview scroll position.
   useEffect(() => {
     if (transcript && isListening) {
       transcriptScrollRef.current?.scrollToEnd({ animated: true });
@@ -50,22 +50,30 @@ export function useVoiceRecording({ whisperContext, onRecordingComplete }: Optio
   const clearTranscript = () => setTranscript('');
 
   /**
-   * Public toggle called by the FAB.
-   * On stop: fires onRecordingComplete (which triggers preview) only when
-   * transcript is non-empty. Does NOT clear transcript automatically —
-   * the transcript must survive until the user explicitly sends or cancels.
+   * Cleanly stops Whisper capture and resets refs.
+   * Awaits stop() fully — no forced timeout — to guarantee the context is free
+   * before the next transcribeRealtime call.
    */
+  const stopCapture = async () => {
+    const stopFn = realtimeRef.current?.stop ?? null;
+    realtimeRef.current = null;
+    if (stopFn) {
+      try {
+        await stopFn();
+      }
+      catch {
+        // ignore stop errors — context may already be stopped
+      }
+    }
+    isCapturingRef.current = false;
+  };
+
   const toggleListening = async () => {
     if (isListening) {
       const finalTranscript = transcript;
       setIsListening(false);
       setIsStopping(true);
-      const stopPromise = realtimeRef.current?.stop() ?? Promise.resolve();
-      realtimeRef.current = null;
-      await Promise.race([
-        stopPromise,
-        new Promise<void>(resolve => setTimeout(resolve, 3000)),
-      ]);
+      await stopCapture();
       setIsStopping(false);
       if (finalTranscript.trim()) {
         onRecordingComplete();
@@ -75,6 +83,12 @@ export function useVoiceRecording({ whisperContext, onRecordingComplete }: Optio
 
     if (!whisperContext)
       return;
+
+    // Guard: if Whisper is still capturing from a previous session, stop it first.
+    // This can happen after an unexpected error or if the context wasn't properly released.
+    if (isCapturingRef.current) {
+      await stopCapture();
+    }
 
     const hasPermission = await ensurePermission();
     if (!hasPermission)
@@ -97,6 +111,8 @@ export function useVoiceRecording({ whisperContext, onRecordingComplete }: Optio
 
     try {
       const { stop, subscribe } = await whisperContext.transcribeRealtime(options);
+      // Mark as capturing only after transcribeRealtime resolves — i.e. Whisper is actually running
+      isCapturingRef.current = true;
       realtimeRef.current = { stop };
       subscribe((event: any) => {
         if (event.data?.result) {
@@ -106,6 +122,8 @@ export function useVoiceRecording({ whisperContext, onRecordingComplete }: Optio
     }
     catch (err) {
       console.error('Realtime transcription failed:', err);
+      isCapturingRef.current = false;
+      realtimeRef.current = null;
       setIsListening(false);
     }
   };
