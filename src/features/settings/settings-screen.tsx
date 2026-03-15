@@ -13,7 +13,7 @@ import { translate } from '@/lib/i18n';
 import { LanguageItem } from './components/language-item';
 import { SettingsContainer } from './components/settings-container';
 import { SettingsItem } from './components/settings-item';
-import { WhisperModelSection } from './components/whisper-model-section';
+import { WhisperModelItem } from './components/whisper-model-item';
 
 export function SettingsScreen() {
   const signOut = useAuth.use.signOut();
@@ -53,7 +53,9 @@ export function SettingsScreen() {
             <LanguageItem />
           </SettingsContainer>
 
-          <WhisperModelSection />
+          <SettingsContainer title="settings.voice_model">
+            <WhisperModelItem />
+          </SettingsContainer>
 
           <SettingsContainer title="settings.about">
             <SettingsItem
