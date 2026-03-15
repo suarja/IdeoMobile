@@ -1,0 +1,450 @@
+import type { MutationCtx, QueryCtx } from './_generated/server';
+import { v } from 'convex/values';
+import {
+  internalMutation,
+  mutation,
+  query,
+} from './_generated/server';
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+async function computeLevel(ctx: MutationCtx | QueryCtx, totalPoints: number): Promise<number> {
+  const levels = await ctx.db.query('levels').withIndex('by_level').order('asc').take(20);
+  let currentLevel = 1;
+  for (const l of levels) {
+    if (totalPoints >= l.minPoints)
+      currentLevel = l.level;
+  }
+  return currentLevel;
+}
+
+async function grantPoints(ctx: MutationCtx, userId: string, points: number): Promise<void> {
+  const stats = await ctx.db
+    .query('userStats')
+    .withIndex('by_userId', q => q.eq('userId', userId))
+    .first();
+
+  const newTotal = (stats?.totalPoints ?? 0) + points;
+  const newLevel = await computeLevel(ctx, newTotal);
+
+  if (stats) {
+    await ctx.db.patch(stats._id, { totalPoints: newTotal, currentLevel: newLevel });
+  }
+  else {
+    await ctx.db.insert('userStats', {
+      userId,
+      totalPoints: newTotal,
+      currentLevel: newLevel,
+      currentStreak: 0,
+      longestStreak: 0,
+      lastSessionAt: 0,
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Seed
+// ---------------------------------------------------------------------------
+
+export const seedLevels = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const existing = await ctx.db.query('levels').first();
+    if (existing)
+      return;
+
+    const levels = [
+      { level: 1, name: 'Dreamer', minPoints: 0, iconEmoji: '🌱' },
+      { level: 2, name: 'Thinker', minPoints: 500, iconEmoji: '💡' },
+      { level: 3, name: 'Builder', minPoints: 1500, iconEmoji: '🔨' },
+      { level: 4, name: 'Maker', minPoints: 3500, iconEmoji: '⚡' },
+      { level: 5, name: 'Founder', minPoints: 7000, iconEmoji: '🚀' },
+    ];
+    for (const l of levels) {
+      await ctx.db.insert('levels', l);
+    }
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Queries
+// ---------------------------------------------------------------------------
+
+export const getUserStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      return null;
+    const userId = identity.subject;
+
+    const stats = await ctx.db
+      .query('userStats')
+      .withIndex('by_userId', q => q.eq('userId', userId))
+      .first();
+
+    const levels = await ctx.db.query('levels').withIndex('by_level').order('asc').take(10);
+
+    const totalPoints = stats?.totalPoints ?? 0;
+    const currentLevelNum = stats?.currentLevel ?? 1;
+
+    const currentLevelData = levels.find(l => l.level === currentLevelNum);
+    const nextLevelData = levels.find(l => l.level === currentLevelNum + 1);
+
+    const pointsToNextLevel = nextLevelData ? Math.max(0, nextLevelData.minPoints - totalPoints) : 0;
+    const progressToNextLevel
+      = nextLevelData && currentLevelData && nextLevelData.minPoints > currentLevelData.minPoints
+        ? Math.min(
+            1,
+            Math.max(
+              0,
+              (totalPoints - currentLevelData.minPoints)
+              / (nextLevelData.minPoints - currentLevelData.minPoints),
+            ),
+          )
+        : 1;
+
+    return {
+      totalPoints,
+      currentLevel: currentLevelNum,
+      levelName: currentLevelData?.name ?? 'Dreamer',
+      levelIcon: currentLevelData?.iconEmoji ?? '🌱',
+      currentStreak: stats?.currentStreak ?? 0,
+      longestStreak: stats?.longestStreak ?? 0,
+      pointsToNextLevel,
+      progressToNextLevel,
+    };
+  },
+});
+
+export const getProjectScores = query({
+  args: { threadId: v.string() },
+  handler: async (ctx, { threadId }) => {
+    const scores = await ctx.db
+      .query('projectScores')
+      .withIndex('by_threadId', q => q.eq('threadId', threadId))
+      .first();
+
+    return {
+      validation: { score: scores?.validationScore ?? 0, weight: scores?.validationWeight ?? 1.0 },
+      design: { score: scores?.designScore ?? 0, weight: scores?.designWeight ?? 1.0 },
+      development: {
+        score: scores?.developmentScore ?? 0,
+        weight: scores?.developmentWeight ?? 1.0,
+      },
+      distribution: {
+        score: scores?.distributionScore ?? 0,
+        weight: scores?.distributionWeight ?? 1.0,
+      },
+    };
+  },
+});
+
+export const getDailyChallenges = query({
+  args: { date: v.string() },
+  handler: async (ctx, { date }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      return [];
+    const userId = identity.subject;
+
+    return ctx.db
+      .query('dailyChallenges')
+      .withIndex('by_userId_date', q => q.eq('userId', userId).eq('date', date))
+      .take(10);
+  },
+});
+
+export const getProjectGoals = query({
+  args: { threadId: v.string() },
+  handler: async (ctx, { threadId }) => {
+    return ctx.db
+      .query('goals')
+      .withIndex('by_threadId', q => q.eq('threadId', threadId))
+      .order('desc')
+      .take(20);
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Public mutations
+// ---------------------------------------------------------------------------
+
+export const completeDailyChallenge = mutation({
+  args: { challengeId: v.id('dailyChallenges') },
+  handler: async (ctx, { challengeId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      throw new Error('Unauthenticated');
+    const userId = identity.subject;
+
+    const challenge = await ctx.db.get(challengeId);
+    if (!challenge)
+      throw new Error('Challenge not found');
+    if (challenge.userId !== userId)
+      throw new Error('Unauthorized');
+    if (challenge.completed)
+      return; // idempotent
+
+    await ctx.db.patch(challengeId, { completed: true, completedAt: Date.now() });
+    await grantPoints(ctx, userId, challenge.points);
+  },
+});
+
+export const completeGoal = mutation({
+  args: { goalId: v.id('goals') },
+  handler: async (ctx, { goalId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      throw new Error('Unauthenticated');
+    const userId = identity.subject;
+
+    const goal = await ctx.db.get(goalId);
+    if (!goal)
+      throw new Error('Goal not found');
+    if (goal.userId !== userId)
+      throw new Error('Unauthorized');
+    if (goal.completed)
+      return; // idempotent
+
+    await ctx.db.patch(goalId, { completed: true, completedAt: Date.now() });
+    await grantPoints(ctx, userId, goal.points);
+  },
+});
+
+export const addGoal = mutation({
+  args: {
+    threadId: v.string(),
+    title: v.string(),
+    points: v.number(),
+    dimension: v.optional(v.string()),
+    createdBy: v.string(),
+  },
+  handler: async (ctx, { threadId, title, points, dimension, createdBy }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      throw new Error('Unauthenticated');
+    const userId = identity.subject;
+
+    return ctx.db.insert('goals', {
+      userId,
+      threadId,
+      title,
+      points,
+      dimension,
+      completed: false,
+      createdBy,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Internal mutations (agent / server-side only)
+// ---------------------------------------------------------------------------
+
+export const addSessionPoints = internalMutation({
+  args: { threadId: v.string() },
+  handler: async (ctx, { threadId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      return; // silently skip if unauthenticated
+
+    const userId = identity.subject;
+    const now = Date.now();
+    const TWO_DAYS_MS = 48 * 60 * 60 * 1000;
+
+    const stats = await ctx.db
+      .query('userStats')
+      .withIndex('by_userId', q => q.eq('userId', userId))
+      .first();
+
+    let newStreak = 1;
+    let longestStreak = stats?.longestStreak ?? 1;
+
+    if (stats && stats.lastSessionAt && now - stats.lastSessionAt <= TWO_DAYS_MS) {
+      newStreak = stats.currentStreak + 1;
+    }
+    longestStreak = Math.max(longestStreak, newStreak);
+
+    // 50 base + 10 per streak day, capped at 50 bonus
+    const streakBonus = Math.min(newStreak * 10, 50);
+    const pointsEarned = 50 + streakBonus;
+    const newTotal = (stats?.totalPoints ?? 0) + pointsEarned;
+    const newLevel = await computeLevel(ctx, newTotal);
+
+    await ctx.db.insert('voiceSessions', { userId, threadId, pointsEarned, createdAt: now });
+
+    if (stats) {
+      await ctx.db.patch(stats._id, {
+        totalPoints: newTotal,
+        currentLevel: newLevel,
+        currentStreak: newStreak,
+        longestStreak,
+        lastSessionAt: now,
+      });
+    }
+    else {
+      await ctx.db.insert('userStats', {
+        userId,
+        totalPoints: newTotal,
+        currentLevel: newLevel,
+        currentStreak: newStreak,
+        longestStreak,
+        lastSessionAt: now,
+      });
+    }
+  },
+});
+
+export const updateProjectScores = internalMutation({
+  args: {
+    threadId: v.string(),
+    scores: v.object({
+      validation: v.optional(v.number()),
+      design: v.optional(v.number()),
+      development: v.optional(v.number()),
+      distribution: v.optional(v.number()),
+    }),
+  },
+  handler: async (ctx, { threadId, scores }) => {
+    const existing = await ctx.db
+      .query('projectScores')
+      .withIndex('by_threadId', q => q.eq('threadId', threadId))
+      .first();
+
+    const now = Date.now();
+
+    if (existing) {
+      const patch: Record<string, number> = { updatedAt: now };
+      if (scores.validation !== undefined)
+        patch.validationScore = scores.validation;
+      if (scores.design !== undefined)
+        patch.designScore = scores.design;
+      if (scores.development !== undefined)
+        patch.developmentScore = scores.development;
+      if (scores.distribution !== undefined)
+        patch.distributionScore = scores.distribution;
+      await ctx.db.patch(existing._id, patch);
+    }
+    else {
+      // Look up userId via threadId
+      const thread = await ctx.db
+        .query('threads')
+        .withIndex('by_threadId', q => q.eq('threadId', threadId))
+        .first();
+      const userId = thread?.userId ?? '';
+
+      await ctx.db.insert('projectScores', {
+        userId,
+        threadId,
+        validationScore: scores.validation ?? 0,
+        designScore: scores.design ?? 0,
+        developmentScore: scores.development ?? 0,
+        distributionScore: scores.distribution ?? 0,
+        validationWeight: 1.0,
+        designWeight: 1.0,
+        developmentWeight: 1.0,
+        distributionWeight: 1.0,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
+export const updateProjectWeights = internalMutation({
+  args: {
+    threadId: v.string(),
+    weights: v.object({
+      validation: v.optional(v.number()),
+      design: v.optional(v.number()),
+      development: v.optional(v.number()),
+      distribution: v.optional(v.number()),
+    }),
+  },
+  handler: async (ctx, { threadId, weights }) => {
+    const existing = await ctx.db
+      .query('projectScores')
+      .withIndex('by_threadId', q => q.eq('threadId', threadId))
+      .first();
+
+    if (existing) {
+      const patch: Record<string, number> = { updatedAt: Date.now() };
+      if (weights.validation !== undefined)
+        patch.validationWeight = weights.validation;
+      if (weights.design !== undefined)
+        patch.designWeight = weights.design;
+      if (weights.development !== undefined)
+        patch.developmentWeight = weights.development;
+      if (weights.distribution !== undefined)
+        patch.distributionWeight = weights.distribution;
+      await ctx.db.patch(existing._id, patch);
+    }
+  },
+});
+
+// Used by agent tools (via chat.ts sendMessage) to create goals without needing client auth
+export const addGoalInternal = internalMutation({
+  args: {
+    threadId: v.string(),
+    title: v.string(),
+    points: v.number(),
+    dimension: v.optional(v.string()),
+  },
+  handler: async (ctx, { threadId, title, points, dimension }) => {
+    const thread = await ctx.db
+      .query('threads')
+      .withIndex('by_threadId', q => q.eq('threadId', threadId))
+      .first();
+    const userId = thread?.userId ?? '';
+
+    return ctx.db.insert('goals', {
+      userId,
+      threadId,
+      title,
+      points,
+      dimension,
+      completed: false,
+      createdBy: 'agent',
+      createdAt: Date.now(),
+    });
+  },
+});
+
+// Used by cron to insert challenges for a single user
+export const insertDailyChallengesForUser = internalMutation({
+  args: {
+    userId: v.string(),
+    date: v.string(),
+    challenges: v.array(
+      v.object({
+        label: v.string(),
+        points: v.number(),
+        dimension: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: async (ctx, { userId, date, challenges }) => {
+    // Guard: skip if already has challenges today
+    const existing = await ctx.db
+      .query('dailyChallenges')
+      .withIndex('by_userId_date', q => q.eq('userId', userId).eq('date', date))
+      .first();
+    if (existing)
+      return;
+
+    for (const c of challenges) {
+      await ctx.db.insert('dailyChallenges', {
+        userId,
+        date,
+        challengeType: 'system',
+        label: c.label,
+        dimension: c.dimension,
+        points: c.points,
+        completed: false,
+      });
+    }
+  },
+});

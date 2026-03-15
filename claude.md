@@ -107,6 +107,7 @@ Les décisions techniques importantes sont documentées dans `docs/architecture/
 | Fichier | Système | Résumé |
 |---------|---------|--------|
 | [`docs/architecture/auth.md`](docs/architecture/auth.md) | Clerk + Convex + SecureStore | Stack auth, flux SSO, persistence session, règles d'identité Convex |
+| [`docs/architecture/gamification.md`](docs/architecture/gamification.md) | Gamification + Focus Screen | 6 tables Convex (levels/userStats/projectScores/voiceSessions/dailyChallenges/goals), scoring, streak, cron défis, outils agent, Focus Screen wiring |
 
 ## Bugs Documentés
 

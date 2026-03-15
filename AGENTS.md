@@ -96,3 +96,33 @@ Key rules summary:
 - Do not use `.filter()` on queries — define indexes and use `.withIndex()` instead.
 - Do not use `.collect()` for unbounded results — use `.take(n)` or paginate.
 - Convex config: `convex/convex.config.ts`. Agent layer: `convex/agents/`.
+
+## Architecture Documentation
+
+Decisions are documented in `docs/architecture/`. Read before touching the relevant systems.
+
+| File | System | Summary |
+|---|---|---|
+| [`docs/architecture/auth.md`](docs/architecture/auth.md) | Clerk + Convex + SecureStore | Auth stack, SSO flow, session persistence, Convex identity rules |
+| [`docs/architecture/gamification.md`](docs/architecture/gamification.md) | Gamification + Focus Screen | 6 Convex tables, scoring system, streak calc, daily challenge cron, agent tools, Focus Screen wiring |
+
+## Next Steps (in-progress work on `feat/focus-screen`)
+
+### 🔴 Clerk Webhook — user initialization
+
+When a user signs up via Clerk, their `userStats` row does not exist until they send a first voice message. This means the daily challenge cron skips them.
+
+**Must implement:** `convex/http.ts` HTTP endpoint listening to Clerk's `user.created` webhook:
+- Verify Svix signature (header `svix-signature`, secret from Clerk dashboard)
+- On `user.created`: call `internal.gamification.initUserStats` to create a zeroed `userStats` row
+- Register the webhook URL in Clerk dashboard: `https://<deployment>.convex.cloud/clerk-webhook`
+
+See `docs/architecture/gamification.md` for the implementation pattern.
+
+### 🟡 Focus Screen UI polish
+
+To be done with a dedicated design agent:
+- Radar chart (4 dimensions, weight-scaled axes) for `projectScores`
+- Badge indicator on Focus tab if today's challenges are all uncompleted
+- "Add goal" button (calls `useAddGoal`)
+- Completion animation on challenge/goal tap

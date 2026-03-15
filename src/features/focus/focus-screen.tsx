@@ -1,21 +1,17 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, TouchableOpacity } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import { colors, FocusAwareStatusBar, ScrollView, Text, View } from '@/components/ui';
 
-const MOCK_DATA = {
-  streak: 7,
-  streakMax: 30,
-  progress: 0.6,
-  points: 340,
-  pointsMax: 500,
-};
-
-const MOCK_INTERACTIONS = [
-  { id: '1', label: 'Idea refined: MusicApp v2', time: '2h ago' },
-  { id: '2', label: 'Blueprint generated', time: 'Yesterday' },
-  { id: '3', label: 'Tech stack validated', time: '2 days ago' },
-];
+import {
+  localDateString,
+  useActiveThreadId,
+  useCompleteDailyChallenge,
+  useCompleteGoal,
+  useDailyChallenges,
+  useProjectGoals,
+  useUserStats,
+} from './api';
 
 type CircularGaugeProps = {
   value: number;
@@ -30,7 +26,7 @@ function CircularGauge({ value, max, label, color, displayValue }: CircularGauge
   const radius = 36;
   const strokeWidth = 6;
   const circumference = 2 * Math.PI * radius;
-  const progress = Math.min(value / max, 1);
+  const progress = Math.min(value / Math.max(max, 1), 1);
   const strokeDashoffset = circumference * (1 - progress);
   const center = size / 2;
 
@@ -68,29 +64,153 @@ function CircularGauge({ value, max, label, color, displayValue }: CircularGauge
 }
 
 function GaugeStats() {
+  const stats = useUserStats();
+  const today = localDateString();
+  const challenges = useDailyChallenges(today);
+
+  const streak = stats?.currentStreak ?? 0;
+  const streakMax = Math.max(stats?.longestStreak ?? 7, streak, 7);
+
+  const totalChallenges = challenges?.length ?? 0;
+  const completedChallenges = challenges?.filter(c => c.completed).length ?? 0;
+  const todayFraction = totalChallenges > 0 ? completedChallenges / totalChallenges : 0;
+
+  const totalPoints = stats?.totalPoints ?? 0;
+  const nextLevelPoints = totalPoints + (stats?.pointsToNextLevel ?? 500);
+
   return (
-    <View className="mb-6 flex-row justify-around">
-      <CircularGauge
-        value={MOCK_DATA.streak}
-        max={MOCK_DATA.streakMax}
-        label="Streak"
-        color={colors.primary[600]}
-        displayValue={String(MOCK_DATA.streak)}
-      />
-      <CircularGauge
-        value={MOCK_DATA.progress}
-        max={1}
-        label="Today"
-        color={colors.brand.dark}
-        displayValue="60%"
-      />
-      <CircularGauge
-        value={MOCK_DATA.points}
-        max={MOCK_DATA.pointsMax}
-        label="Points"
-        color={colors.primary[600]}
-        displayValue={String(MOCK_DATA.points)}
-      />
+    <View className="mb-4">
+      {stats?.levelName && (
+        <Text className="mb-4 text-center text-sm font-medium" style={{ color: colors.brand.muted }}>
+          {stats.levelIcon}
+          {' '}
+          {stats.levelName}
+        </Text>
+      )}
+      <View className="flex-row justify-around">
+        <CircularGauge
+          value={streak}
+          max={streakMax}
+          label="Streak"
+          color={colors.primary[600]}
+          displayValue={String(streak)}
+        />
+        <CircularGauge
+          value={todayFraction}
+          max={1}
+          label="Today"
+          color={colors.brand.dark}
+          displayValue={`${Math.round(todayFraction * 100)}%`}
+        />
+        <CircularGauge
+          value={totalPoints}
+          max={nextLevelPoints}
+          label="Points"
+          color={colors.primary[600]}
+          displayValue={String(totalPoints)}
+        />
+      </View>
+    </View>
+  );
+}
+
+function DailyChallengesList() {
+  const today = localDateString();
+  const challenges = useDailyChallenges(today);
+  const completeChallenge = useCompleteDailyChallenge();
+
+  if (!challenges || challenges.length === 0) {
+    return (
+      <Text className="mb-6 text-sm" style={{ color: colors.brand.muted }}>
+        No challenges today — check back later.
+      </Text>
+    );
+  }
+
+  return (
+    <View className="mb-6">
+      <Text className="mb-3 text-lg font-semibold" style={{ color: colors.brand.dark }}>
+        Daily challenges
+      </Text>
+      {challenges.map(item => (
+        <TouchableOpacity
+          key={item._id}
+          onPress={() => {
+            if (!item.completed) {
+              completeChallenge({ challengeId: item._id });
+            }
+          }}
+          className="flex-row items-center justify-between border-b py-3"
+          style={{ borderColor: colors.brand.border }}
+        >
+          <View className="flex-1 pr-4">
+            <Text
+              className="text-sm"
+              style={{
+                color: item.completed ? colors.brand.muted : colors.brand.dark,
+                textDecorationLine: item.completed ? 'line-through' : 'none',
+              }}
+            >
+              {item.label}
+            </Text>
+          </View>
+          <Text className="text-xs font-semibold" style={{ color: colors.primary[600] }}>
+            +
+            {item.points}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+function ProjectGoalsList() {
+  const threadId = useActiveThreadId();
+  const goals = useProjectGoals(threadId ?? null);
+  const completeGoal = useCompleteGoal();
+
+  if (!threadId || !goals || goals.length === 0) {
+    return null;
+  }
+
+  return (
+    <View className="mb-6">
+      <Text className="mb-3 text-lg font-semibold" style={{ color: colors.brand.dark }}>
+        Goals
+      </Text>
+      {goals.map(item => (
+        <TouchableOpacity
+          key={item._id}
+          onPress={() => {
+            if (!item.completed) {
+              completeGoal({ goalId: item._id });
+            }
+          }}
+          className="flex-row items-center justify-between border-b py-3"
+          style={{ borderColor: colors.brand.border }}
+        >
+          <View className="flex-1 pr-4">
+            <Text
+              className="text-sm"
+              style={{
+                color: item.completed ? colors.brand.muted : colors.brand.dark,
+                textDecorationLine: item.completed ? 'line-through' : 'none',
+              }}
+            >
+              {item.title}
+            </Text>
+            {item.dimension && (
+              <Text className="mt-0.5 text-xs" style={{ color: colors.brand.muted }}>
+                {item.dimension}
+              </Text>
+            )}
+          </View>
+          <Text className="text-xs font-semibold" style={{ color: colors.primary[600] }}>
+            +
+            {item.points}
+          </Text>
+        </TouchableOpacity>
+      ))}
     </View>
   );
 }
@@ -107,40 +227,9 @@ export function FocusScreen() {
 
           <GaugeStats />
 
-          {/* Daily objective */}
-          <View
-            className="mb-6 rounded-xl p-4"
-            style={{ backgroundColor: colors.brand.selected, borderWidth: 1, borderColor: colors.brand.border }}
-          >
-            <Text
-              className="mb-1 text-xs font-semibold tracking-wider uppercase"
-              style={{ color: colors.brand.muted }}
-            >
-              Today's objective
-            </Text>
-            <Text className="text-base font-medium" style={{ color: colors.brand.dark }}>
-              Refine your app's core value proposition
-            </Text>
-          </View>
+          <DailyChallengesList />
 
-          {/* Recent interactions */}
-          <Text className="mb-3 text-lg font-semibold" style={{ color: colors.brand.dark }}>
-            Recent interactions
-          </Text>
-          {MOCK_INTERACTIONS.map(item => (
-            <View
-              key={item.id}
-              className="flex-row items-center justify-between border-b py-3"
-              style={{ borderColor: colors.brand.border }}
-            >
-              <Text className="flex-1 pr-4 text-sm" style={{ color: colors.brand.dark }}>
-                {item.label}
-              </Text>
-              <Text className="text-xs" style={{ color: colors.brand.muted }}>
-                {item.time}
-              </Text>
-            </View>
-          ))}
+          <ProjectGoalsList />
         </View>
       </ScrollView>
     </View>

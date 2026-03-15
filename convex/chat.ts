@@ -1,4 +1,6 @@
+import { tool } from 'ai';
 import { v } from 'convex/values';
+import { z } from 'zod';
 import { internal } from './_generated/api';
 import { action, internalMutation, mutation, query } from './_generated/server';
 import { chatAgent } from './agents/chatAgent';
@@ -12,7 +14,6 @@ export const getOrCreateThread = mutation({
     }
     const userId = identity.subject;
 
-    console.log('Getting or creating thread for userId:', userId);
     const existing = await ctx.db
       .query('threads')
       .withIndex('by_userId', q => q.eq('userId', userId))
@@ -30,6 +31,23 @@ export const getOrCreateThread = mutation({
     });
 
     return threadId;
+  },
+});
+
+export const getActiveThread = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      return null;
+    const userId = identity.subject;
+
+    const thread = await ctx.db
+      .query('threads')
+      .withIndex('by_userId', q => q.eq('userId', userId))
+      .first();
+
+    return thread?.threadId ?? null;
   },
 });
 
@@ -62,7 +80,48 @@ export const sendMessage = action({
     });
 
     const { thread } = await chatAgent.continueThread(ctx, { threadId });
-    const { text } = await thread.generateText({ prompt: content });
+
+    const { text } = await thread.generateText({
+      prompt: content,
+      tools: {
+        updateProjectScores: tool({
+          description:
+            'Update the radar progress scores for the current project. Scores are 0-100 per dimension.',
+          inputSchema: z.object({
+            validation: z.number().min(0).max(100).optional(),
+            design: z.number().min(0).max(100).optional(),
+            development: z.number().min(0).max(100).optional(),
+            distribution: z.number().min(0).max(100).optional(),
+          }),
+          execute: async (scores) => {
+            await ctx.runMutation(internal.gamification.updateProjectScores, {
+              threadId,
+              scores,
+            });
+            return 'Project scores updated.';
+          },
+        }),
+        addGoal: tool({
+          description: 'Create a goal for the current project on behalf of the agent.',
+          inputSchema: z.object({
+            title: z.string(),
+            points: z.number().min(50).max(500),
+            dimension: z
+              .enum(['validation', 'design', 'development', 'distribution'])
+              .optional(),
+          }),
+          execute: async ({ title, points, dimension }) => {
+            await ctx.runMutation(internal.gamification.addGoalInternal, {
+              threadId,
+              title,
+              points,
+              dimension,
+            });
+            return `Goal "${title}" created.`;
+          },
+        }),
+      },
+    });
 
     const responseText = text ?? '';
 
@@ -71,6 +130,9 @@ export const sendMessage = action({
       role: 'assistant',
       content: responseText,
     });
+
+    // Award session points (silently skips if unauthenticated)
+    await ctx.runMutation(internal.gamification.addSessionPoints, { threadId });
 
     return responseText;
   },
