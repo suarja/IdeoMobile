@@ -20,7 +20,7 @@ export function SettingsItem({ text, value, icon, onPress }: ItemProps) {
       className="flex-1 flex-row items-center justify-between px-4 py-3"
     >
       <View className="flex-row items-center">
-        {icon && <View className="pr-2">{icon}</View>}
+        {icon && <View className="pr-1.5">{icon}</View>}
         <Text style={{ color: colors.brand.dark }} tx={text} />
       </View>
       <View className="flex-row items-center">
