@@ -20,7 +20,7 @@ export function SettingsScreen() {
   const iconColor = colors.brand.muted;
   return (
     <>
-      <FocusAwareStatusBar />
+      <FocusAwareStatusBar style="dark" />
 
       <ScrollView style={{ backgroundColor: colors.brand.bg }}>
         <View className="flex-1 px-4">

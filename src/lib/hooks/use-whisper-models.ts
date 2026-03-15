@@ -11,6 +11,9 @@ import {
 } from 'expo-file-system/legacy';
 import { useCallback, useEffect, useState } from 'react';
 import { initWhisper, initWhisperVad } from 'whisper.rn/index.js';
+import { storage } from '@/lib/storage';
+
+const SELECTED_MODEL_KEY = 'whisper_selected_model';
 
 export type WhisperModel = {
   id: string;
@@ -253,6 +256,7 @@ export function useWhisperModels() {
 
         setWhisperContext(context);
         setCurrentModelId(modelId);
+        storage.set(SELECTED_MODEL_KEY, modelId);
         console.log(`Whisper context initialized for model: ${model.label}`);
 
         // Optionally initialize VAD context
@@ -291,6 +295,7 @@ export function useWhisperModels() {
     setWhisperContext(null);
     setVadContext(null);
     setCurrentModelId(null);
+    storage.delete(SELECTED_MODEL_KEY);
     console.log('Whisper contexts reset');
   }, []);
 
@@ -363,6 +368,7 @@ export function useWhisperModels() {
         setWhisperContext(null);
         setCurrentModelId(null);
         setVadContext(null);
+        storage.delete(SELECTED_MODEL_KEY);
       }
     },
     [currentModelId, modelFiles, whisperContext],
@@ -418,6 +424,11 @@ export function useWhisperModels() {
 
         if (Object.keys(fileMap).length > 0) {
           setModelFiles(prev => ({ ...prev, ...fileMap }));
+        }
+
+        const saved = storage.getString(SELECTED_MODEL_KEY);
+        if (saved && isMounted) {
+          setCurrentModelId(saved);
         }
       }
       catch (error) {

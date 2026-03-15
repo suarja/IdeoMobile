@@ -4,6 +4,7 @@ import { ActivityIndicator, TouchableOpacity, View } from 'react-native';
 import { colors, Text } from '@/components/ui';
 import { Modal, useModal } from '@/components/ui/modal';
 import { useWhisperModels, WHISPER_MODELS } from '@/lib/hooks/use-whisper-models';
+import { translate } from '@/lib/i18n';
 
 import { SettingsItem } from './settings-item';
 
@@ -16,7 +17,6 @@ function formatBytes(bytes: number): string {
 }
 
 type ModelRowActionsProps = {
-  model: WhisperModel;
   isActive: boolean;
   downloaded: boolean;
   isThisDownloading: boolean;
@@ -104,7 +104,6 @@ function ModelRow({ model, isLast, isActive, downloaded, fileSize, progress, isT
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <ModelRowActions
-            model={model}
             isActive={isActive}
             downloaded={downloaded}
             isThisDownloading={isThisDownloading}
@@ -134,7 +133,7 @@ export function WhisperModelItem() {
   } = useWhisperModels();
 
   const activeModel = WHISPER_MODELS.find(m => m.id === currentModelId);
-  const snapPoints = [`${Math.min(WHISPER_MODELS.length * 88 + 120, 600)}`];
+  const snapPoints = ['70%'];
   const isBusy = isDownloading || isInitializingModel;
 
   return (
@@ -147,16 +146,20 @@ export function WhisperModelItem() {
       <Modal
         ref={modal.ref}
         snapPoints={snapPoints}
-        title="Voice Model"
         backgroundStyle={{ backgroundColor: colors.brand.bg }}
       >
-        <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 }}>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: colors.brand.dark, textAlign: 'center' }}>
+            {translate('settings.voice_model')}
+          </Text>
+        </View>
+        <View style={{ paddingHorizontal: 16 }}>
           {WHISPER_MODELS.map((model, index) => {
             const isActive = currentModelId === model.id;
             const downloaded = isModelDownloaded(model.id);
             const fileInfo = modelFiles[model.id];
             const progress = getDownloadProgress(model.id);
-            const isThisDownloading = isDownloading && progress > 0 && progress < 1;
+            const isThisDownloading = progress > 0 && progress < 1;
             return (
               <ModelRow
                 key={model.id}
