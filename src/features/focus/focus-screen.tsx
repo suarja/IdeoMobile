@@ -129,7 +129,7 @@ function DailyChallengesSection() {
 }
 
 function GoalRow({ item, onComplete }: { item: ProjectGoal; onComplete: () => void }) {
-  const isAgent = item.createdBy.startsWith('agent:') || item.createdBy === 'system';
+  const isAgent = item.createdBy.startsWith('agent') || item.createdBy === 'system';
   return (
     <View className="flex-row items-center border-b py-3" style={{ borderColor: colors.brand.border }}>
       <TouchableOpacity
