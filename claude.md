@@ -100,6 +100,14 @@ For the mobile client, use `convex/react` with `ConvexProvider` (or `ConvexProvi
 - **Commits**: Conventional Commits format (enforced by commitlint). Direct commits to `main`/`master` are blocked.
 - **Pre-commit hook**: Runs `type-check` + `lint-staged` automatically.
 
+## Documentation Architecture
+
+Les décisions techniques importantes sont documentées dans `docs/architecture/`. Consulter avant de toucher aux systèmes concernés.
+
+| Fichier | Système | Résumé |
+|---------|---------|--------|
+| [`docs/architecture/auth.md`](docs/architecture/auth.md) | Clerk + Convex + SecureStore | Stack auth, flux SSO, persistence session, règles d'identité Convex |
+
 ## Bugs Documentés
 
 Des incidents résolus sont consignés dans `docs/bugs/` pour éviter les régressions futures. Consulter ces fichiers avant de toucher aux systèmes concernés.
