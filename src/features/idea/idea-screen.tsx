@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, FocusAwareStatusBar, Text, View } from '@/components/ui';
 
 import { useWhisperModels } from '@/lib/hooks/use-whisper-models';
-
 import { translate } from '@/lib/i18n';
+import { storage } from '@/lib/storage';
 
 import { MicBottomBar } from './components/mic-bottom-bar';
 import { TranscriptBox } from './components/transcript-box';
@@ -40,8 +40,13 @@ export function IdeaScreen() {
   const { whisperContext, isInitializingModel, isDownloading, currentModelId, initializeWhisperModel, getDownloadProgress }
     = useWhisperModels();
 
+  const didInit = useRef(false);
   useEffect(() => {
-    initializeWhisperModel('base').catch(console.error);
+    if (didInit.current)
+      return;
+    didInit.current = true;
+    const savedModelId = storage.getString('whisper_selected_model') ?? 'base';
+    initializeWhisperModel(savedModelId).catch(console.error);
   }, [initializeWhisperModel]);
 
   const session = useIdeaSession();
