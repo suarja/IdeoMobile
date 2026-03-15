@@ -21,7 +21,7 @@ const TAB_CONFIGS: Record<string, TabConfig> = {
   settings: { activeIcon: 'person', inactiveIcon: 'person-outline', label: 'Me' },
 };
 
-export function MetalOrangeTabBar({ state, navigation }: BottomTabBarProps) {
+export function MetalOrangeTabBar({ state, navigation, descriptors }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -46,6 +46,8 @@ export function MetalOrangeTabBar({ state, navigation }: BottomTabBarProps) {
             }
           };
 
+          const hasBadge = route.name === 'focus' && !!descriptors[route.key].options.tabBarBadge;
+
           return (
             <TouchableOpacity
               key={route.key}
@@ -53,12 +55,15 @@ export function MetalOrangeTabBar({ state, navigation }: BottomTabBarProps) {
               style={styles.tab}
               activeOpacity={0.7}
             >
-              <Ionicons
-                name={isFocused ? config.activeIcon : config.inactiveIcon}
-                size={22}
-                color={colors.brand.bg}
-                style={{ opacity: isFocused ? 1 : 0.45 }}
-              />
+              <View style={{ position: 'relative' }}>
+                <Ionicons
+                  name={isFocused ? config.activeIcon : config.inactiveIcon}
+                  size={22}
+                  color={colors.brand.bg}
+                  style={{ opacity: isFocused ? 1 : 0.45 }}
+                />
+                {hasBadge && <View style={styles.badgeDot} />}
+              </View>
               <Text
                 style={[
                   styles.label,
@@ -108,5 +113,15 @@ const styles = StyleSheet.create({
   },
   labelInactive: {
     opacity: 0.4,
+  },
+  badgeDot: {
+    backgroundColor: colors.danger[500],
+    borderRadius: 4,
+    height: 8,
+    position: 'absolute',
+    right: -2,
+    top: -2,
+    width: 8,
+    zIndex: 10,
   },
 });

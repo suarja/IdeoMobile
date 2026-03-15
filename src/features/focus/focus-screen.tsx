@@ -1,8 +1,8 @@
-import { StyleSheet, TouchableOpacity } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
+import type { DailyChallenge, ProjectGoal } from './api';
+
+import { TouchableOpacity } from 'react-native';
 
 import { colors, FocusAwareStatusBar, ScrollView, Text, View } from '@/components/ui';
-
 import {
   localDateString,
   useActiveThreadId,
@@ -10,212 +10,201 @@ import {
   useCompleteGoal,
   useDailyChallenges,
   useProjectGoals,
-  useUserStats,
+  useProjectScores,
 } from './api';
+import { LevelHeader } from './components/level-header';
+import { RadarChart } from './components/radar-chart';
 
-type CircularGaugeProps = {
-  value: number;
-  max: number;
-  label: string;
-  color: string;
-  displayValue: string;
+const DIMENSION_COLORS: Record<string, string> = {
+  validation: colors.success[500],
+  design: colors.primary[600],
+  development: colors.charcoal[700],
+  distribution: colors.warning[500],
 };
 
-function CircularGauge({ value, max, label, color, displayValue }: CircularGaugeProps) {
-  const size = 90;
-  const radius = 36;
-  const strokeWidth = 6;
-  const circumference = 2 * Math.PI * radius;
-  const progress = Math.min(value / Math.max(max, 1), 1);
-  const strokeDashoffset = circumference * (1 - progress);
-  const center = size / 2;
-
+function DimensionBadge({ dimension }: { dimension: string }) {
+  const bg = DIMENSION_COLORS[dimension] ?? colors.brand.muted;
+  const label = dimension.charAt(0).toUpperCase() + dimension.slice(1);
   return (
-    <View style={styles.gaugeContainer}>
-      <Svg width={size} height={size}>
-        <Circle
-          cx={center}
-          cy={center}
-          r={radius}
-          stroke="rgba(67,56,49,0.12)"
-          strokeWidth={strokeWidth}
-          fill="none"
-        />
-        <Circle
-          cx={center}
-          cy={center}
-          r={radius}
-          stroke={color}
-          strokeWidth={strokeWidth}
-          fill="none"
-          strokeDasharray={`${circumference} ${circumference}`}
-          strokeDashoffset={strokeDashoffset}
-          strokeLinecap="round"
-          rotation="-90"
-          origin={`${center}, ${center}`}
-        />
-      </Svg>
-      <View style={styles.gaugeInner}>
-        <Text style={[styles.gaugeValue, { color }]}>{displayValue}</Text>
-      </View>
-      <Text style={styles.gaugeLabel}>{label}</Text>
+    <View
+      style={{
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        backgroundColor: bg,
+      }}
+    >
+      <Text style={{ fontSize: 10, color: colors.white, fontWeight: '600' }}>{label}</Text>
     </View>
   );
 }
 
-function GaugeStats() {
-  const stats = useUserStats();
-  const today = localDateString();
-  const challenges = useDailyChallenges(today);
-
-  const streak = stats?.currentStreak ?? 0;
-  const streakMax = Math.max(stats?.longestStreak ?? 7, streak, 7);
-
-  const totalChallenges = challenges?.length ?? 0;
-  const completedChallenges = challenges?.filter(c => c.completed).length ?? 0;
-  const todayFraction = totalChallenges > 0 ? completedChallenges / totalChallenges : 0;
-
-  const totalPoints = stats?.totalPoints ?? 0;
-  const nextLevelPoints = totalPoints + (stats?.pointsToNextLevel ?? 500);
-
+function ChallengeRow({ item, onComplete }: { item: DailyChallenge; onComplete: () => void }) {
   return (
-    <View className="mb-4">
-      {stats?.levelName && (
-        <Text className="mb-4 text-center text-sm font-medium" style={{ color: colors.brand.muted }}>
-          {stats.levelIcon}
-          {' '}
-          {stats.levelName}
-        </Text>
-      )}
-      <View className="flex-row justify-around">
-        <CircularGauge
-          value={streak}
-          max={streakMax}
-          label="Streak"
-          color={colors.primary[600]}
-          displayValue={String(streak)}
-        />
-        <CircularGauge
-          value={todayFraction}
-          max={1}
-          label="Today"
-          color={colors.brand.dark}
-          displayValue={`${Math.round(todayFraction * 100)}%`}
-        />
-        <CircularGauge
-          value={totalPoints}
-          max={nextLevelPoints}
-          label="Points"
-          color={colors.primary[600]}
-          displayValue={String(totalPoints)}
-        />
-      </View>
+    <View className="flex-row items-center border-b py-3" style={{ borderColor: colors.brand.border }}>
+      <TouchableOpacity
+        onPress={onComplete}
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: 9,
+          borderWidth: 1.5,
+          borderColor: colors.brand.dark,
+          backgroundColor: item.completed ? colors.brand.dark : 'transparent',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {item.completed && (
+          <Text style={{ fontSize: 11, color: colors.white }}>✓</Text>
+        )}
+      </TouchableOpacity>
+      <Text
+        className="flex-1 px-3"
+        style={{
+          color: item.completed ? colors.brand.muted : colors.brand.dark,
+          textDecorationLine: item.completed ? 'line-through' : 'none',
+        }}
+      >
+        {item.label}
+      </Text>
+      {item.dimension && <DimensionBadge dimension={item.dimension} />}
+      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary[600], marginLeft: 8 }}>
+        +
+        {item.points}
+      </Text>
     </View>
   );
 }
 
-function DailyChallengesList() {
-  const today = localDateString();
-  const challenges = useDailyChallenges(today);
+function DailyChallengesSection() {
+  const challenges = useDailyChallenges(localDateString());
   const completeChallenge = useCompleteDailyChallenge();
 
-  if (!challenges || challenges.length === 0) {
-    return (
-      <Text className="mb-6 text-sm" style={{ color: colors.brand.muted }}>
-        No challenges today — check back later.
-      </Text>
-    );
-  }
+  const completedCount = challenges?.filter(c => c.completed).length ?? 0;
+  const totalCount = challenges?.length ?? 0;
 
   return (
     <View className="mb-6">
-      <Text className="mb-3 text-lg font-semibold" style={{ color: colors.brand.dark }}>
-        Daily challenges
-      </Text>
-      {challenges.map(item => (
-        <TouchableOpacity
-          key={item._id}
-          onPress={() => {
-            if (!item.completed) {
-              completeChallenge({ challengeId: item._id });
-            }
-          }}
-          className="flex-row items-center justify-between border-b py-3"
-          style={{ borderColor: colors.brand.border }}
-        >
-          <View className="flex-1 pr-4">
-            <Text
-              className="text-sm"
-              style={{
-                color: item.completed ? colors.brand.muted : colors.brand.dark,
-                textDecorationLine: item.completed ? 'line-through' : 'none',
-              }}
-            >
-              {item.label}
+      <View className="mb-3 flex-row items-center justify-between">
+        <Text style={{ fontSize: 18, fontWeight: '600', color: colors.brand.dark }}>
+          Daily challenges
+        </Text>
+        {completedCount < totalCount && totalCount > 0 && (
+          <View
+            style={{
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              backgroundColor: colors.primary[600],
+              borderRadius: 12,
+            }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.white }}>
+              {completedCount}
+              /
+              {totalCount}
             </Text>
           </View>
-          <Text className="text-xs font-semibold" style={{ color: colors.primary[600] }}>
-            +
-            {item.points}
-          </Text>
-        </TouchableOpacity>
-      ))}
+        )}
+      </View>
+      {!challenges || challenges.length === 0
+        ? (
+            <Text className="text-sm" style={{ color: colors.brand.muted }}>
+              No challenges today — check back later.
+            </Text>
+          )
+        : challenges.map(item => (
+            <ChallengeRow
+              key={item._id}
+              item={item}
+              onComplete={() => {
+                if (!item.completed) {
+                  completeChallenge({ challengeId: item._id });
+                }
+              }}
+            />
+          ))}
     </View>
   );
 }
 
-function ProjectGoalsList() {
+function GoalRow({ item, onComplete }: { item: ProjectGoal; onComplete: () => void }) {
+  const isAgent = item.createdBy.startsWith('agent:') || item.createdBy === 'system';
+  return (
+    <View className="flex-row items-center border-b py-3" style={{ borderColor: colors.brand.border }}>
+      <TouchableOpacity
+        onPress={onComplete}
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: 9,
+          borderWidth: 1.5,
+          borderColor: colors.brand.dark,
+          backgroundColor: item.completed ? colors.brand.dark : 'transparent',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {item.completed && (
+          <Text style={{ fontSize: 11, color: colors.white }}>✓</Text>
+        )}
+      </TouchableOpacity>
+      <View className="flex-1 px-3">
+        <Text
+          style={{
+            color: item.completed ? colors.brand.muted : colors.brand.dark,
+            textDecorationLine: item.completed ? 'line-through' : 'none',
+          }}
+        >
+          {item.title}
+        </Text>
+        {item.dimension && (
+          <Text style={{ fontSize: 11, color: colors.brand.muted, marginTop: 2 }}>
+            {item.dimension}
+          </Text>
+        )}
+      </View>
+      <Text style={{ fontSize: 16 }}>{isAgent ? '🤖' : '👤'}</Text>
+      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary[600], marginLeft: 8 }}>
+        +
+        {item.points}
+      </Text>
+    </View>
+  );
+}
+
+function ProjectGoalsSection() {
   const threadId = useActiveThreadId();
   const goals = useProjectGoals(threadId ?? null);
   const completeGoal = useCompleteGoal();
 
-  if (!threadId || !goals || goals.length === 0) {
+  if (!threadId || goals === undefined || goals.length === 0) {
     return null;
   }
 
   return (
     <View className="mb-6">
-      <Text className="mb-3 text-lg font-semibold" style={{ color: colors.brand.dark }}>
+      <Text className="mb-3" style={{ fontSize: 18, fontWeight: '600', color: colors.brand.dark }}>
         Goals
       </Text>
       {goals.map(item => (
-        <TouchableOpacity
+        <GoalRow
           key={item._id}
-          onPress={() => {
+          item={item}
+          onComplete={() => {
             if (!item.completed) {
               completeGoal({ goalId: item._id });
             }
           }}
-          className="flex-row items-center justify-between border-b py-3"
-          style={{ borderColor: colors.brand.border }}
-        >
-          <View className="flex-1 pr-4">
-            <Text
-              className="text-sm"
-              style={{
-                color: item.completed ? colors.brand.muted : colors.brand.dark,
-                textDecorationLine: item.completed ? 'line-through' : 'none',
-              }}
-            >
-              {item.title}
-            </Text>
-            {item.dimension && (
-              <Text className="mt-0.5 text-xs" style={{ color: colors.brand.muted }}>
-                {item.dimension}
-              </Text>
-            )}
-          </View>
-          <Text className="text-xs font-semibold" style={{ color: colors.primary[600] }}>
-            +
-            {item.points}
-          </Text>
-        </TouchableOpacity>
+        />
       ))}
     </View>
   );
 }
 
 export function FocusScreen() {
+  const threadId = useActiveThreadId();
+  const scores = useProjectScores(threadId ?? null);
   return (
     <View className="flex-1" style={{ backgroundColor: colors.brand.bg }}>
       <FocusAwareStatusBar />
@@ -224,41 +213,12 @@ export function FocusScreen() {
           <Text className="mb-6 text-2xl font-bold" style={{ color: colors.brand.dark }}>
             Focus
           </Text>
-
-          <GaugeStats />
-
-          <DailyChallengesList />
-
-          <ProjectGoalsList />
+          <LevelHeader />
+          <RadarChart scores={scores} />
+          <DailyChallengesSection />
+          <ProjectGoalsSection />
         </View>
       </ScrollView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  gaugeContainer: {
-    alignItems: 'center',
-    position: 'relative',
-    width: 100,
-  },
-  gaugeInner: {
-    alignItems: 'center',
-    bottom: 0,
-    justifyContent: 'center',
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-  },
-  gaugeLabel: {
-    color: colors.brand.muted,
-    fontSize: 12,
-    marginTop: 4,
-  },
-  gaugeValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginTop: 18,
-  },
-});
