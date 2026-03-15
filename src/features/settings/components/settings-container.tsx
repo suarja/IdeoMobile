@@ -9,6 +9,8 @@ type Props = {
 };
 
 export function SettingsContainer({ children, title }: Props) {
+  const childArray = React.Children.toArray(children);
+
   return (
     <>
       {title && (
@@ -19,14 +21,27 @@ export function SettingsContainer({ children, title }: Props) {
         />
       )}
       <View
-        className="rounded-xl"
+        className="overflow-hidden rounded-xl"
         style={{
           backgroundColor: colors.brand.card,
           borderWidth: 1,
           borderColor: colors.brand.border,
         }}
       >
-        {children}
+        {childArray.map((child, index) => (
+          <React.Fragment key={index}>
+            {child}
+            {index < childArray.length - 1 && (
+              <View
+                style={{
+                  height: 1,
+                  marginHorizontal: 16,
+                  backgroundColor: 'rgba(0,0,0,0.06)',
+                }}
+              />
+            )}
+          </React.Fragment>
+        ))}
       </View>
     </>
   );
