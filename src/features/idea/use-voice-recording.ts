@@ -62,7 +62,10 @@ export function useVoiceRecording({ whisperContext, onRecordingComplete }: Optio
       setIsStopping(true);
       const stopPromise = realtimeRef.current?.stop() ?? Promise.resolve();
       realtimeRef.current = null;
-      await stopPromise;
+      await Promise.race([
+        stopPromise,
+        new Promise<void>(resolve => setTimeout(resolve, 3000)),
+      ]);
       setIsStopping(false);
       if (finalTranscript.trim()) {
         onRecordingComplete();
