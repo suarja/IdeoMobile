@@ -15,6 +15,7 @@ const envSchema = z.object({
   EXPO_PUBLIC_CONVEX_URL: z.string().url(),
   EXPO_PUBLIC_VAR_NUMBER: z.number(),
   EXPO_PUBLIC_VAR_BOOL: z.boolean(),
+  EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
 
   // only available for app.config.ts usage
   APP_BUILD_ONLY_VAR: z.string().optional(),
@@ -61,6 +62,7 @@ const _env: z.infer<typeof envSchema> = {
   EXPO_PUBLIC_VAR_NUMBER: Number(process.env.EXPO_PUBLIC_VAR_NUMBER ?? 0),
   EXPO_PUBLIC_VAR_BOOL: process.env.EXPO_PUBLIC_VAR_BOOL === 'true',
   APP_BUILD_ONLY_VAR: process.env.APP_BUILD_ONLY_VAR,
+  EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY,
 };
 
 function getValidatedEnv(env: z.infer<typeof envSchema>) {
