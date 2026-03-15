@@ -109,3 +109,26 @@ For the mobile client, use `convex/react` with `ConvexProvider` (or `ConvexProvi
 - [Components](https://starter.obytes.com/ui-and-theme/components)
 - [Forms](https://starter.obytes.com/ui-and-theme/Forms)
 - [Data fetching](https://starter.obytes.com/guides/data-fetching)
+
+## Idea Feature Architecture (`src/features/idea/`)
+
+### Hook responsibilities
+- `useWhisperModels` (`src/lib/hooks/`) — model download, init, context lifecycle. Not idea-specific.
+- `useVoiceRecording` — microphone permission, Whisper realtime session, raw transcript string, scroll ref.
+- `useIdeaSession` — Convex thread bootstrap, message send, preview/cancel state, agent error, last messages.
+
+### Hook coordination pattern
+`IdeaScreen` is the coordinator. `useVoiceRecording` signals completion via an `onRecordingComplete` callback.
+`IdeaScreen` passes `session.enterPreview` as that callback. The two hooks have no direct dependency on each other.
+
+### Transcript clear ownership
+`clearTranscript` belongs to `useVoiceRecording`. `IdeaScreen` calls it explicitly in `handleSend` and `handleCancel`
+so the transcript survives into preview state and is only cleared when the user acts on it.
+
+### POC_USER_ID
+Hardcoded stub in `api.ts`. When auth lands, replace with `useAuthStore.use.token()` on the client
+and derive `userId` from `ctx.auth.getUserIdentity()` on the Convex side (never pass userId as an argument).
+
+### Sub-components
+- `TranscriptBox` — handles all three transcript states (listening / stopping / preview) with its own styles.
+- `MicBottomBar` — status text + FAB, purely presentational, no internal state.
