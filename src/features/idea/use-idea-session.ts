@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { POC_USER_ID, useGetOrCreateThread, useMessages, useSendMessage } from './api';
+import { useGetOrCreateThread, useMessages, useSendMessage } from './api';
 
 type Message = { role: string; content: string };
 
@@ -26,9 +26,8 @@ export function useIdeaSession(): IdeaSession {
   const messages = useMessages(threadId);
 
   // Bootstrap thread once on mount.
-  // POC_USER_ID is a stub — replace with ctx.auth when auth lands.
   useEffect(() => {
-    getOrCreateThread({ userId: POC_USER_ID })
+    getOrCreateThread({})
       .then(id => setThreadId(id))
       .catch(console.error);
   }, [getOrCreateThread]);

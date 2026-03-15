@@ -4,8 +4,15 @@ import { action, internalMutation, mutation, query } from './_generated/server';
 import { chatAgent } from './agents/chatAgent';
 
 export const getOrCreateThread = mutation({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error('Unauthenticated');
+    }
+    const userId = identity.subject;
+
+    console.log('Getting or creating thread for userId:', userId);
     const existing = await ctx.db
       .query('threads')
       .withIndex('by_userId', q => q.eq('userId', userId))
