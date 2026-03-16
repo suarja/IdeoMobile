@@ -76,8 +76,9 @@ export const getUserStats = query({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity)
+    if (!identity) {
       return null;
+    }
     const userId = identity.subject;
 
     const stats = await ctx.db
@@ -90,8 +91,10 @@ export const getUserStats = query({
     const totalPoints = stats?.totalPoints ?? 0;
     const currentLevelNum = stats?.currentLevel ?? 1;
 
-    const currentLevelData = levels.find(l => l.level === currentLevelNum);
-    const nextLevelData = levels.find(l => l.level === currentLevelNum + 1);
+    // If stored currentLevel is invalid (e.g. 0), fall back to level 1
+    const resolvedLevelNum = levels.some(l => l.level === currentLevelNum) ? currentLevelNum : 1;
+    const currentLevelData = levels.find(l => l.level === resolvedLevelNum);
+    const nextLevelData = levels.find(l => l.level === resolvedLevelNum + 1);
 
     const pointsToNextLevel = nextLevelData ? Math.max(0, nextLevelData.minPoints - totalPoints) : 0;
     const progressToNextLevel
@@ -104,7 +107,7 @@ export const getUserStats = query({
               / (nextLevelData.minPoints - currentLevelData.minPoints),
             ),
           )
-        : 1;
+        : nextLevelData ? 0 : 1; // 0 = fallback on error, 1 = max level reached
 
     return {
       totalPoints,
@@ -146,8 +149,11 @@ export const getDailyChallenges = query({
   args: { date: v.string() },
   handler: async (ctx, { date }) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity)
+    if (!identity) {
+      // Return empty — never throw in queries for transient auth gaps.
+      // The subscription stays alive and re-evaluates once auth arrives.
       return [];
+    }
     const userId = identity.subject;
 
     return ctx.db

@@ -1,30 +1,43 @@
 import type { Id } from '../../../convex/_generated/dataModel';
-import { useMutation, useQuery } from 'convex/react';
+import { useConvexAuth, useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 
+// Auth-dependent queries MUST use 'skip' until Convex auth is established.
+// Without this, useQuery creates a subscription during render, but client.setAuth()
+// runs in an effect (AFTER render). The server receives the subscription before
+// the auth token → executes without auth → throws → useQuery throws in React.
+
 export function useActiveThreadId() {
-  return useQuery(api.chat.getActiveThread);
+  const { isAuthenticated } = useConvexAuth();
+  return useQuery(api.chat.getActiveThread, isAuthenticated ? {} : 'skip');
 }
 
 export function useUserStats() {
-  return useQuery(api.gamification.getUserStats);
+  const { isAuthenticated } = useConvexAuth();
+  return useQuery(api.gamification.getUserStats, isAuthenticated ? {} : 'skip');
 }
 
 export function useProjectScores(threadId: string | null) {
+  const { isAuthenticated } = useConvexAuth();
   return useQuery(
     api.gamification.getProjectScores,
-    threadId ? { threadId } : 'skip',
+    isAuthenticated && threadId ? { threadId } : 'skip',
   );
 }
 
 export function useDailyChallenges(date: string) {
-  return useQuery(api.gamification.getDailyChallenges, { date });
+  const { isAuthenticated } = useConvexAuth();
+  return useQuery(
+    api.gamification.getDailyChallenges,
+    isAuthenticated ? { date } : 'skip',
+  );
 }
 
 export function useProjectGoals(threadId: string | null) {
+  const { isAuthenticated } = useConvexAuth();
   return useQuery(
     api.gamification.getProjectGoals,
-    threadId ? { threadId } : 'skip',
+    isAuthenticated && threadId ? { threadId } : 'skip',
   );
 }
 

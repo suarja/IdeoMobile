@@ -1,3 +1,5 @@
+import { useConvexAuth } from 'convex/react';
+
 import { useEffect, useState } from 'react';
 
 import { useGetOrCreateThread, useMessages, useSendMessage } from './api';
@@ -21,16 +23,22 @@ export function useIdeaSession(): IdeaSession {
   const [isPreview, setIsPreview] = useState(false);
   const [agentError, setAgentError] = useState<string | null>(null);
 
+  const { isAuthenticated } = useConvexAuth();
   const getOrCreateThread = useGetOrCreateThread();
   const sendMessage = useSendMessage();
   const messages = useMessages(threadId);
 
-  // Bootstrap thread once on mount.
+  // Bootstrap thread once Convex is authenticated.
+  // On reload, Clerk restores the session async — we must wait for isAuthenticated
+  // before calling the mutation, otherwise Convex throws "Unauthenticated" and
+  // threadId stays null forever (mutations don't auto-retry).
   useEffect(() => {
+    if (!isAuthenticated)
+      return;
     getOrCreateThread({})
       .then(id => setThreadId(id))
       .catch(console.error);
-  }, [getOrCreateThread]);
+  }, [isAuthenticated, getOrCreateThread]);
 
   const lastUserMessage = messages
     ? [...messages].reverse().find(m => m.role === 'user') ?? null

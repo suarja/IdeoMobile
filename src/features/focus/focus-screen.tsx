@@ -79,6 +79,7 @@ function ChallengeRow({ item, onComplete }: { item: DailyChallenge; onComplete: 
 
 function DailyChallengesSection() {
   const challenges = useDailyChallenges(localDateString());
+  // console.log('Daily challenges:', challenges);
   const completeChallenge = useCompleteDailyChallenge();
 
   const completedCount = challenges?.filter(c => c.completed).length ?? 0;

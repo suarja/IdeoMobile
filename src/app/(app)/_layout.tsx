@@ -1,6 +1,7 @@
 import { useAuth } from '@clerk/expo';
+import { useConvexAuth } from 'convex/react';
 import { Redirect, SplashScreen, Tabs } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { MetalOrangeTabBar } from '@/components/metal-orange-tab-bar';
 import { localDateString, useDailyChallenges } from '@/features/focus/api';
@@ -9,6 +10,19 @@ import { useIsFirstTime } from '@/lib/hooks/use-is-first-time';
 export default function TabLayout() {
   const { isSignedIn, isLoaded } = useAuth();
   const [isFirstTime] = useIsFirstTime();
+
+  // Track Convex auth state transitions — this is what controls query subscriptions
+  const { isAuthenticated: convexAuth, isLoading: convexLoading } = useConvexAuth();
+  useEffect(() => {
+    console.log('[convex-auth]', { convexAuth, convexLoading }, 'at', new Date().toLocaleTimeString());
+  }, [convexAuth, convexLoading]);
+
+  // Stabilize isSignedIn against Clerk v3 native sync (undefined flicker)
+  // Without this: !undefined === true → redirect to /sign-in → unmount → data loss
+  const stableIsSignedIn = useRef(isSignedIn);
+  if (isSignedIn !== undefined) {
+    stableIsSignedIn.current = isSignedIn;
+  }
 
   const today = localDateString();
   const challenges = useDailyChallenges(today);
@@ -29,7 +43,7 @@ export default function TabLayout() {
   if (isFirstTime) {
     return <Redirect href="/onboarding" />;
   }
-  if (!isSignedIn) {
+  if (!stableIsSignedIn.current) {
     return <Redirect href="/sign-in" />;
   }
 
