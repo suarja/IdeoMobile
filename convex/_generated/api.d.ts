@@ -14,7 +14,9 @@ import type * as chat from "../chat.js";
 import type * as crons from "../crons.js";
 import type * as gamification from "../gamification.js";
 import type * as http from "../http.js";
+import type * as memory from "../memory.js";
 import type * as playground from "../playground.js";
+import type * as projects from "../projects.js";
 
 import type {
   ApiFromModules,
@@ -29,7 +31,9 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   gamification: typeof gamification;
   http: typeof http;
+  memory: typeof memory;
   playground: typeof playground;
+  projects: typeof projects;
 }>;
 
 /**
