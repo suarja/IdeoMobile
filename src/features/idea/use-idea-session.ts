@@ -2,7 +2,7 @@ import { useConvexAuth } from 'convex/react';
 
 import { useEffect, useState } from 'react';
 
-import { useGetOrCreateThread, useMessages, useSendMessage } from './api';
+import { useActiveProject, useGetOrCreateThread, useMessages, useSendMessage } from './api';
 
 type Message = { role: string; content: string };
 
@@ -18,7 +18,6 @@ type IdeaSession = {
 };
 
 export function useIdeaSession(): IdeaSession {
-  const [threadId, setThreadId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isPreview, setIsPreview] = useState(false);
   const [agentError, setAgentError] = useState<string | null>(null);
@@ -26,18 +25,20 @@ export function useIdeaSession(): IdeaSession {
   const { isAuthenticated } = useConvexAuth();
   const getOrCreateThread = useGetOrCreateThread();
   const sendMessage = useSendMessage();
+
+  // Reactive subscription: updates automatically when the active project changes
+  // (e.g. after setActiveProject is called from the Projects sheet)
+  const activeProject = useActiveProject();
+  const threadId = activeProject?.threadId ?? null;
+
   const messages = useMessages(threadId);
 
-  // Bootstrap thread once Convex is authenticated.
-  // On reload, Clerk restores the session async — we must wait for isAuthenticated
-  // before calling the mutation, otherwise Convex throws "Unauthenticated" and
-  // threadId stays null forever (mutations don't auto-retry).
+  // Ensure a project exists on mount. Result is ignored — threadId comes
+  // reactively from useActiveProject above, not from this call's return value.
   useEffect(() => {
     if (!isAuthenticated)
       return;
-    getOrCreateThread({})
-      .then(id => setThreadId(id))
-      .catch(console.error);
+    getOrCreateThread({}).catch(console.error);
   }, [isAuthenticated, getOrCreateThread]);
 
   const lastUserMessage = messages
