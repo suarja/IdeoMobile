@@ -1,11 +1,12 @@
+import type { Id } from './_generated/dataModel';
 import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { internalMutation, mutation, query } from './_generated/server';
 import { chatAgent } from './agents/chatAgent';
 
-export const createProject = mutation({
+export const createProjectAndThread = internalMutation({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{ projectId: Id<'projects'>; threadId: string }> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new Error('Unauthenticated');
@@ -44,6 +45,13 @@ export const createProject = mutation({
   },
 });
 
+export const createProject = mutation({
+  args: {},
+  handler: async (ctx): Promise<{ projectId: Id<'projects'>; threadId: string }> => {
+    return ctx.runMutation(internal.projects.createProjectAndThread, {});
+  },
+});
+
 export const getActiveProject = query({
   args: {},
   handler: async (ctx) => {
@@ -78,6 +86,12 @@ export const setActiveProject = mutation({
       throw new Error('Unauthenticated');
     }
     const userId = identity.subject;
+
+    // Verify the target project belongs to this user
+    const targetProject = await ctx.db.get(projectId);
+    if (!targetProject || targetProject.userId !== userId) {
+      throw new Error('Forbidden');
+    }
 
     // Deactivate all projects for this user
     const allProjects = await ctx.db

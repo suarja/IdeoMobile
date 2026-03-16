@@ -44,7 +44,7 @@ export function ProjectsItem() {
                 }}
                 onPress={async () => {
                   await setActive({ projectId: project.projectId });
-                  modal.ref.current?.close();
+                  modal.ref.current?.dismiss();
                 }}
               >
                 <View style={{ flex: 1 }}>

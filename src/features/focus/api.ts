@@ -91,11 +91,11 @@ export function useUserMemory() {
   return useQuery(api.memory.getUserMemory, isAuthenticated ? {} : 'skip');
 }
 
-export function useProjectMemory(projectId: string | null) {
+export function useProjectMemory(projectId: Id<'projects'> | null) {
   const { isAuthenticated } = useConvexAuth();
   return useQuery(
     api.memory.getProjectMemory,
-    isAuthenticated && projectId ? { projectId: projectId as Id<'projects'> } : 'skip',
+    isAuthenticated && projectId ? { projectId } : 'skip',
   );
 }
 

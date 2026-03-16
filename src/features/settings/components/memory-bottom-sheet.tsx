@@ -1,4 +1,4 @@
-import { Alert, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, TouchableOpacity, View } from 'react-native';
 import { colors, Text } from '@/components/ui';
 import { Modal, useModal } from '@/components/ui/modal';
 import { useProjectMemory, useUserMemory } from '@/features/focus/api';
@@ -101,7 +101,7 @@ export function MemoryItem() {
   const modal = useModal();
   const activeProject = useActiveProject();
   const userMemory = useUserMemory();
-  const projectMemory = useProjectMemory(activeProject ? String(activeProject.projectId) : null);
+  const projectMemory = useProjectMemory(activeProject ? activeProject.projectId : null);
   const projectName = activeProject?.name ?? translate('settings.no_name_project');
   const hasAnyMemory = (userMemory?.length ?? 0) > 0 || (projectMemory?.length ?? 0) > 0;
 
@@ -120,7 +120,7 @@ export function MemoryItem() {
             {translate('settings.agent_memory')}
           </Text>
         </View>
-        <View style={{ paddingHorizontal: 16, flex: 1 }}>
+        <ScrollView style={{ paddingHorizontal: 16, flex: 1 }}>
           {!hasAnyMemory && (
             <Text
               style={{ fontSize: 14, color: colors.brand.muted, textAlign: 'center', marginTop: 24 }}
@@ -134,7 +134,7 @@ export function MemoryItem() {
           {(projectMemory?.length ?? 0) > 0 && (
             <ProjectMemorySection projectMemory={projectMemory!} projectName={projectName} />
           )}
-        </View>
+        </ScrollView>
       </Modal>
     </>
   );

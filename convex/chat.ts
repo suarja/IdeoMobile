@@ -1,15 +1,16 @@
+import type { Id } from './_generated/dataModel';
 import { anthropic } from '@ai-sdk/anthropic';
 import { generateText, tool } from 'ai';
 import { v } from 'convex/values';
 import { z } from 'zod';
-import { api, internal } from './_generated/api';
+import { internal } from './_generated/api';
 import { action, internalAction, internalMutation, internalQuery, mutation, query } from './_generated/server';
 import { chatAgent } from './agents/chatAgent';
 
 export const getOrCreateThread = mutation({
   args: {},
   handler: async (ctx): Promise<string> => {
-    const result = await ctx.runMutation(api.projects.createProject, {});
+    const result = await ctx.runMutation(internal.projects.createProjectAndThread, {});
     return result.threadId;
   },
 });
@@ -56,7 +57,7 @@ type MemEntry = { key: string; value: string };
 type MemData = {
   userMem: MemEntry[];
   projectMem: MemEntry[];
-  projectId?: any;
+  projectId?: Id<'projects'>;
   userId?: string;
 };
 
@@ -155,7 +156,6 @@ function buildAgentTools(runMutation: RunMutationFn, threadId: string, memData: 
       description: 'Record the end of a voice work session. Call when the gap since last message is >12h, when user signals end of session, or when a clear goal was reached.',
       inputSchema: z.object({
         summary: z.string().describe('1-2 sentence summary of what was accomplished'),
-        pointsEarned: z.number().describe('Points to attribute (50 base)'),
       }),
       execute: async ({ summary }) => {
         await runMutation(internal.gamification.addSessionPoints, { threadId });
@@ -200,7 +200,6 @@ export const sendMessage = action({
 
     const responseText = text ?? '';
     await ctx.runMutation(internal.chat.insertMessage, { threadId, role: 'assistant', content: responseText });
-    await ctx.runMutation(internal.gamification.addSessionPoints, { threadId });
 
     if (messageCount === 0) {
       await ctx.scheduler.runAfter(0, internal.chat.generateThreadTitle, { threadId, content });
