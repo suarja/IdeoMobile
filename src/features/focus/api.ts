@@ -85,3 +85,25 @@ export type ProjectGoal = {
   createdBy: string;
   dimension?: string;
 };
+
+export function useUserMemory() {
+  const { isAuthenticated } = useConvexAuth();
+  return useQuery(api.memory.getUserMemory, isAuthenticated ? {} : 'skip');
+}
+
+export function useProjectMemory(projectId: string | null) {
+  const { isAuthenticated } = useConvexAuth();
+  return useQuery(
+    api.memory.getProjectMemory,
+    isAuthenticated && projectId ? { projectId: projectId as Id<'projects'> } : 'skip',
+  );
+}
+
+export function useListProjects() {
+  const { isAuthenticated } = useConvexAuth();
+  return useQuery(api.projects.listProjects, isAuthenticated ? {} : 'skip');
+}
+
+export function useSetActiveProject() {
+  return useMutation(api.projects.setActiveProject);
+}

@@ -17,3 +17,12 @@ export function useSendMessage() {
 export function useMessages(threadId: string | null) {
   return useQuery(api.chat.listMessages, threadId ? { threadId } : 'skip');
 }
+
+export function useCreateProject() {
+  return useMutation(api.projects.createProject);
+}
+
+export function useActiveProject() {
+  const { isAuthenticated } = useConvexAuth();
+  return useQuery(api.projects.getActiveProject, isAuthenticated ? {} : 'skip');
+}
