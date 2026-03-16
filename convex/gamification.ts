@@ -37,7 +37,7 @@ async function grantPoints(ctx: MutationCtx, userId: string, points: number): Pr
       userId,
       totalPoints: newTotal,
       currentLevel: newLevel,
-      currentStreak: 0,
+      currentStreak: 1,
       longestStreak: 0,
       lastSessionAt: 0,
     });
@@ -118,6 +118,8 @@ export const getUserStats = query({
       longestStreak: stats?.longestStreak ?? 0,
       pointsToNextLevel,
       progressToNextLevel,
+      nextLevelName: nextLevelData?.name ?? null,
+      nextLevelIcon: nextLevelData?.iconEmoji ?? null,
     };
   },
 });

@@ -8,6 +8,7 @@ import Svg, {
   Polygon,
   Text as SvgText,
 } from 'react-native-svg';
+import { colors } from '@/components/ui';
 
 type Props = {
   scores: FunctionReturnType<typeof api.gamification.getProjectScores> | undefined;
@@ -16,6 +17,13 @@ type Props = {
 const CX = 130;
 const CY = 130;
 const MAX_RADIUS = 80;
+
+const DIMENSION_COLORS: Record<string, string> = {
+  validation: colors.success[500],
+  development: colors.charcoal[700],
+  distribution: colors.warning[500],
+  design: colors.primary[600],
+};
 
 const AXES = [
   { key: 'validation', label: 'Validation', angle: -Math.PI / 2 },
@@ -58,7 +66,7 @@ export function RadarChart({ scores }: Props) {
             key={fraction}
             points={getGridPolygonPoints(fraction)}
             fill="none"
-            stroke="#E8D88A"
+            stroke="#C8BEA0"
             strokeWidth={1}
           />
         ))}
@@ -73,7 +81,7 @@ export function RadarChart({ scores }: Props) {
               y1={CY}
               x2={tip.x}
               y2={tip.y}
-              stroke="#E8D88A"
+              stroke="#C8BEA0"
               strokeWidth={1}
             />
           );
@@ -83,8 +91,8 @@ export function RadarChart({ scores }: Props) {
         {scores && (
           <Polygon
             points={dataPolygonPoints}
-            fill="rgba(255, 108, 0, 0.20)"
-            stroke="#FF6C00"
+            fill="rgba(67, 56, 49, 0.14)"
+            stroke="#433831"
             strokeWidth={2}
           />
         )}
@@ -92,7 +100,7 @@ export function RadarChart({ scores }: Props) {
         {/* Data dots */}
         {scores
           && dataPoints.map((p, i) => (
-            <Circle key={AXES[i].key} cx={p.x} cy={p.y} r={4} fill="#FF6C00" />
+            <Circle key={AXES[i].key} cx={p.x} cy={p.y} r={4} fill={DIMENSION_COLORS[AXES[i].key] ?? '#433831'} />
           ))}
 
         {/* Labels */}
@@ -106,7 +114,7 @@ export function RadarChart({ scores }: Props) {
                 x={pos.x}
                 y={pos.y - 7}
                 textAnchor="middle"
-                fill="#E8D88A"
+                fill="#433831"
                 fontSize={10}
               >
                 {label}
@@ -116,7 +124,7 @@ export function RadarChart({ scores }: Props) {
                   x={pos.x}
                   y={pos.y + 7}
                   textAnchor="middle"
-                  fill="#FF6C00"
+                  fill={DIMENSION_COLORS[key] ?? '#433831'}
                   fontSize={10}
                 >
                   {scoreVal}

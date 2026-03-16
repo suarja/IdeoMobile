@@ -69,7 +69,7 @@ function ChallengeRow({ item, onComplete }: { item: DailyChallenge; onComplete: 
         {item.label}
       </Text>
       {item.dimension && <DimensionBadge dimension={item.dimension} />}
-      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary[600], marginLeft: 8 }}>
+      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.brand.muted, marginLeft: 8 }}>
         +
         {item.points}
       </Text>
@@ -96,7 +96,7 @@ function DailyChallengesSection() {
             style={{
               paddingHorizontal: 8,
               paddingVertical: 2,
-              backgroundColor: colors.primary[600],
+              backgroundColor: colors.brand.dark,
               borderRadius: 12,
             }}
           >
@@ -166,7 +166,7 @@ function GoalRow({ item, onComplete }: { item: ProjectGoal; onComplete: () => vo
         )}
       </View>
       <Text style={{ fontSize: 16 }}>{isAgent ? '🤖' : '👤'}</Text>
-      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.primary[600], marginLeft: 8 }}>
+      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.brand.muted, marginLeft: 8 }}>
         +
         {item.points}
       </Text>
