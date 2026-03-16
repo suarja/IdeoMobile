@@ -1,8 +1,13 @@
-import { useAction, useMutation, useQuery } from 'convex/react';
+import { useAction, useConvexAuth, useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 
 export function useGetOrCreateThread() {
   return useMutation(api.chat.getOrCreateThread);
+}
+
+export function useActiveThread() {
+  const { isAuthenticated } = useConvexAuth();
+  return useQuery(api.chat.getActiveThread, isAuthenticated ? {} : 'skip');
 }
 
 export function useSendMessage() {

@@ -8,6 +8,7 @@ import { colors, FocusAwareStatusBar, Text, View } from '@/components/ui';
 import { useWhisperModels } from '@/lib/hooks/use-whisper-models';
 import { translate } from '@/lib/i18n';
 
+import { useActiveThread } from './api';
 import { MicBottomBar } from './components/mic-bottom-bar';
 import { TranscriptBox } from './components/transcript-box';
 import { useIdeaSession } from './use-idea-session';
@@ -44,6 +45,7 @@ export function IdeaScreen() {
   }, [initializeWhisperModel]);
 
   const session = useIdeaSession();
+  const activeThread = useActiveThread();
 
   const recording = useVoiceRecording({
     whisperContext,
@@ -86,7 +88,9 @@ export function IdeaScreen() {
 
       {/* Scrollable content — title, user message, error */}
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.ideaTitle}>{translate('idea.title_placeholder')}</Text>
+        <Text style={styles.ideaTitle}>
+          {activeThread?.title ?? translate('idea.title_placeholder')}
+        </Text>
 
         {showEmpty && (
           <View style={styles.emptyState}>

@@ -9,9 +9,11 @@
  */
 
 import type * as agents_chatAgent from "../agents/chatAgent.js";
+import type * as challenges from "../challenges.js";
 import type * as chat from "../chat.js";
 import type * as crons from "../crons.js";
 import type * as gamification from "../gamification.js";
+import type * as http from "../http.js";
 import type * as playground from "../playground.js";
 
 import type {
@@ -22,9 +24,11 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "agents/chatAgent": typeof agents_chatAgent;
+  challenges: typeof challenges;
   chat: typeof chat;
   crons: typeof crons;
   gamification: typeof gamification;
+  http: typeof http;
   playground: typeof playground;
 }>;
 

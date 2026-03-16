@@ -5,6 +5,7 @@ export default defineSchema({
   threads: defineTable({
     userId: v.string(),
     threadId: v.string(),
+    title: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index('by_userId', ['userId'])

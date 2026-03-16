@@ -1,16 +1,17 @@
 import type { DailyChallenge, ProjectGoal } from './api';
 
-import { TouchableOpacity } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Modal, TouchableOpacity } from 'react-native';
 
 import { colors, FocusAwareStatusBar, ScrollView, Text, View } from '@/components/ui';
 import {
   localDateString,
   useActiveThreadId,
-  useCompleteDailyChallenge,
   useCompleteGoal,
   useDailyChallenges,
   useProjectGoals,
   useProjectScores,
+  useValidateAndCompleteDailyChallenge,
 } from './api';
 import { LevelHeader } from './components/level-header';
 import { RadarChart } from './components/radar-chart';
@@ -39,11 +40,36 @@ function DimensionBadge({ dimension }: { dimension: string }) {
   );
 }
 
-function ChallengeRow({ item, onComplete }: { item: DailyChallenge; onComplete: () => void }) {
+function ChallengeRow({
+  item,
+  threadId,
+  onComplete,
+}: {
+  item: DailyChallenge;
+  threadId: string;
+  onComplete: (result: { approved: boolean; message: string }) => void;
+}) {
+  const [validating, setValidating] = useState(false);
+  const validate = useValidateAndCompleteDailyChallenge();
+
+  const handlePress = async () => {
+    if (item.completed || validating)
+      return;
+    setValidating(true);
+    try {
+      const result = await validate({ challengeId: item._id, threadId });
+      onComplete(result ?? { approved: false, message: 'Validation failed.' });
+    }
+    finally {
+      setValidating(false);
+    }
+  };
+
   return (
     <View className="flex-row items-center border-b py-3" style={{ borderColor: colors.brand.border }}>
       <TouchableOpacity
-        onPress={onComplete}
+        onPress={handlePress}
+        disabled={validating || item.completed}
         style={{
           width: 18,
           height: 18,
@@ -55,9 +81,11 @@ function ChallengeRow({ item, onComplete }: { item: DailyChallenge; onComplete: 
           justifyContent: 'center',
         }}
       >
-        {item.completed && (
-          <Text style={{ fontSize: 11, color: colors.white }}>✓</Text>
-        )}
+        {validating
+          ? <ActivityIndicator size="small" color={colors.brand.dark} />
+          : item.completed
+            ? <Text style={{ fontSize: 11, color: colors.white }}>✓</Text>
+            : null}
       </TouchableOpacity>
       <Text
         className="flex-1 px-3"
@@ -79,8 +107,8 @@ function ChallengeRow({ item, onComplete }: { item: DailyChallenge; onComplete: 
 
 function DailyChallengesSection() {
   const challenges = useDailyChallenges(localDateString());
-  // console.log('Daily challenges:', challenges);
-  const completeChallenge = useCompleteDailyChallenge();
+  const threadId = useActiveThreadId();
+  const [rejectionMessage, setRejectionMessage] = useState<string | null>(null);
 
   const completedCount = challenges?.filter(c => c.completed).length ?? 0;
   const totalCount = challenges?.length ?? 0;
@@ -118,13 +146,42 @@ function DailyChallengesSection() {
             <ChallengeRow
               key={item._id}
               item={item}
-              onComplete={() => {
-                if (!item.completed) {
-                  completeChallenge({ challengeId: item._id });
-                }
+              threadId={threadId ?? ''}
+              onComplete={(result) => {
+                if (!result.approved)
+                  setRejectionMessage(result.message);
               }}
             />
           ))}
+      <Modal visible={!!rejectionMessage} transparent animationType="fade">
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.45)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: 32,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: colors.white,
+              borderRadius: 16,
+              padding: 24,
+              width: '100%',
+            }}
+          >
+            <Text style={{ fontSize: 16, color: colors.brand.dark, marginBottom: 16, lineHeight: 22 }}>
+              {rejectionMessage}
+            </Text>
+            <TouchableOpacity onPress={() => setRejectionMessage(null)}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.brand.dark, textAlign: 'right' }}>
+                Got it
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

@@ -1,20 +1,21 @@
 # Gamification & Focus Screen Architecture
 
 **Implémenté :** 2026-03-15
+**Mis à jour :** 2026-03-16
 **Branch :** `feat/focus-screen`
-**Statut :** Backend complet, UI filaire branchée — webhook Clerk + polish UI en cours
+**Statut :** Backend complet, UI branchée — webhook Clerk actif, validation agent opérationnelle
 
 ---
 
 ## Vue d'ensemble
 
 Le système de gamification alimente l'onglet **Focus** (tab 2). Il sert deux objectifs :
-1. **Engagement quotidien** — streak, défis quotidiens, progression de niveau
+1. **Engagement quotidien** — streak, défis quotidiens avec validation IA, progression de niveau
 2. **Avancement de projet** — radar chart sur 4 dimensions (Validation, Design, Development, Distribution)
 
 ---
 
-## Schema Convex (6 nouvelles tables)
+## Schema Convex (6 tables gamification + threads augmenté)
 
 | Table | Rôle | Index clés |
 |---|---|---|
@@ -25,7 +26,9 @@ Le système de gamification alimente l'onglet **Focus** (tab 2). Il sert deux ob
 | `dailyChallenges` | Défis du jour (système + agent) | `by_userId_date` |
 | `goals` | Objectifs par projet (agent ou user) | `by_threadId`, `by_userId` |
 
-La table `threads` a reçu un index `by_threadId` pour permettre le lookup inverse (threadId → userId), utilisé par `updateProjectScores` et `addGoalInternal`.
+La table `threads` a reçu :
+- Index `by_threadId` — lookup inverse threadId → userId
+- Champ `title?: string` — nom court du projet, généré par Haiku après le premier message
 
 ---
 
@@ -60,24 +63,41 @@ Les niveaux sont seedés une fois via `gamification:seedLevels` (déjà fait en 
 ### Nouveaux fichiers
 - **`convex/gamification.ts`** — toutes les fonctions gamification :
   - Mutations publiques : `seedLevels`, `completeDailyChallenge`, `completeGoal`, `addGoal`
-  - Mutations internes : `addSessionPoints`, `updateProjectScores`, `updateProjectWeights`, `addGoalInternal`, `insertDailyChallengesForUser`
+  - Mutations internes : `addSessionPoints`, `updateProjectScores`, `updateProjectWeights`, `addGoalInternal`, `insertDailyChallengesForUser`, `completeDailyChallengeInternal`, `initNewUser`, `initProjectScores`
+  - Queries internes : `getDailyChallengeById`
+  - Actions publiques : `validateAndCompleteDailyChallenge`
   - Queries : `getUserStats`, `getProjectScores`, `getDailyChallenges`, `getProjectGoals`
 - **`convex/crons.ts`** — cron quotidien à 06:00 UTC pour générer les défis (`generateDailyChallenges`)
-- **`src/features/focus/api.ts`** — hooks Convex pour le Focus screen : `useUserStats`, `useProjectScores`, `useDailyChallenges`, `useProjectGoals`, `useActiveThreadId`, `useCompleteDailyChallenge`, `useCompleteGoal`, `useAddGoal`
+- **`convex/challenges.ts`** — helpers partagés : `SYSTEM_CHALLENGE_POOL`, `pickRandom`, `utcDateString` (extrait de `crons.ts` pour éviter la duplication avec `initNewUser`)
+- **`convex/http.ts`** — webhook Clerk `user.created` : initialise `userStats` + défis du jour pour les nouveaux users
+- **`src/features/focus/api.ts`** — hooks Convex pour le Focus screen : `useUserStats`, `useProjectScores`, `useDailyChallenges`, `useProjectGoals`, `useActiveThreadId`, `useCompleteDailyChallenge`, `useCompleteGoal`, `useAddGoal`, `useValidateAndCompleteDailyChallenge`
 
 ### Fichiers modifiés
-- **`convex/schema.ts`** — 6 nouvelles tables + index `by_threadId` sur `threads`
-- **`convex/chat.ts`** — ajout de `getActiveThread` query + appel `addSessionPoints` après chaque `sendMessage` + outils agent inline (`updateProjectScores`, `addGoal`)
-- **`src/features/focus/focus-screen.tsx`** — MOCK_DATA remplacé par queries Convex live
+- **`convex/schema.ts`** — 6 nouvelles tables + `title?: string` sur `threads`
+- **`convex/chat.ts`** — `getActiveThread` retourne `{ threadId, title }` ; `getOrCreateThread` appelle `initProjectScores` ; `sendMessage` déclenche `generateThreadTitle` après le premier message ; nouvelles fonctions `listMessagesInternal`, `countMessages`, `updateThreadTitle`, `generateThreadTitle`
+- **`src/features/focus/focus-screen.tsx`** — `ChallengeRow` avec spinner de validation IA + modal de rejet ; `DailyChallengesSection` avec état de rejet
+- **`src/features/idea/api.ts`** — ajout de `useActiveThread()` retournant `{ threadId, title } | null`
+- **`src/features/idea/idea-screen.tsx`** — titre du projet live depuis `threads.title`, fallback sur la traduction placeholder
 
 ---
 
 ## Flux d'exécution
 
-### 1. Envoi d'un message vocal
+### 1. Création d'un nouvel utilisateur (webhook Clerk)
+```
+Clerk user.created → POST /clerk-webhook (convex/http.ts)
+  → vérification signature Svix
+  → initNewUser (internalMutation)
+      → insert userStats (si absent) avec valeurs à zéro
+      → insertDailyChallengesForUser : 3-4 défis du jour générés immédiatement
+```
+
+### 2. Envoi d'un message vocal
 ```
 IdeaScreen.handleSend()
   → sendMessage action (convex/chat.ts)
+    → countMessages → mémorise si c'est le premier message
+    → insertMessage (user)
     → chatAgent.continueThread(...).generateText()
       [l'agent peut appeler updateProjectScores ou addGoal via tool use]
     → insertMessage (assistant)
@@ -85,9 +105,22 @@ IdeaScreen.handleSend()
         → calcule streak + bonus
         → insert voiceSessions
         → upsert userStats
+    → si premier message : scheduler.runAfter(0, generateThreadTitle)
+        → Haiku génère un nom de projet en 3-5 mots
+        → updateThreadTitle patch threads.title
+        → IdeaScreen reflète le titre en temps réel (subscription live)
 ```
 
-### 2. Génération des défis quotidiens (cron)
+### 3. Création d'un thread (projectScores auto-initialisé)
+```
+getOrCreateThread (mutation)
+  → chatAgent.createThread
+  → insert threads
+  → initProjectScores (internalMutation)
+      → insert projectScores avec scores à 0 si absent
+```
+
+### 4. Génération des défis quotidiens (cron)
 ```
 cron 06:00 UTC → generateDailyChallenges (internalAction)
   → queryAllUserIds (lit tous les userStats)
@@ -96,21 +129,29 @@ cron 06:00 UTC → generateDailyChallenges (internalAction)
     → insère 3–4 défis aléatoires du pool système
 ```
 
-### 3. Complétion d'un défi (client)
+### 5. Validation IA d'un défi (client)
 ```
-TouchableOpacity onPress → completeDailyChallenge (mutation)
-  → vérifie auth (userId du JWT)
-  → vérifie ownership (challenge.userId === userId)
-  → idempotent : si déjà completed, return early
-  → patch completed + completedAt
-  → grantPoints → upsert userStats
+ChallengeRow onPress → useValidateAndCompleteDailyChallenge (action)
+  → vérifie auth
+  → getDailyChallengeById : lit le défi sans re-vérifier l'auth
+  → si déjà complété : retourne { approved: true, message: "Already completed!" }
+  → listMessagesInternal : récupère l'historique du thread
+  → generateText (Haiku) : prompt JSON → { approved, message }
+    → parse manuel avec fallback optimiste si le JSON est invalide
+  → si approved : completeDailyChallengeInternal → grantPoints
+  → retourne { approved, message } au client
 ```
+
+**UX :**
+- Spinner dans le cercle du défi pendant la validation
+- Si rejet : modal avec le message de l'agent ("Got it" pour fermer)
+- Si approuvé : le défi passe en état complété normalement
 
 ---
 
 ## Outils Agent (tool use)
 
-L'agent peut appeler deux outils dans `sendMessage` via AI SDK v5 (`tool` + `inputSchema`) :
+L'agent peut appeler deux outils dans `sendMessage` via AI SDK (`tool` + `inputSchema`) :
 
 ```ts
 updateProjectScores({ validation?, design?, development?, distribution? })
@@ -122,13 +163,11 @@ addGoal({ title, points, dimension? })
 // → crée un objectif de projet sans dépendre de l'auth client
 ```
 
-**Attention AI SDK v5 :** utiliser `inputSchema` (pas `parameters`) dans la définition des outils. La fonction `tool()` de `ai` est le helper officiel.
-
 ---
 
 ## Focus Screen — contrat UI
 
-Le screen effectue **4 subscriptions Convex séparées** (fine-grained reactivity) :
+Le screen effectue **5 subscriptions Convex séparées** (fine-grained reactivity) :
 
 | Hook | Source | Données |
 |---|---|---|
@@ -136,6 +175,9 @@ Le screen effectue **4 subscriptions Convex séparées** (fine-grained reactivit
 | `useDailyChallenges(date)` | `dailyChallenges` | liste des défis du jour avec état completed |
 | `useProjectGoals(threadId)` | `goals` | objectifs actifs + complétés |
 | `useActiveThreadId()` | `threads` | threadId de l'utilisateur courant |
+| `useProjectScores(threadId)` | `projectScores` | scores radar 4 dimensions |
+
+L'**Idea Screen** s'abonne en plus à `useActiveThread()` pour afficher le titre du projet live.
 
 Les 3 jauges circulaires sont mappées :
 - **Streak** → `userStats.currentStreak`
@@ -144,15 +186,26 @@ Les 3 jauges circulaires sont mappées :
 
 ---
 
+## Configuration webhook Clerk
+
+1. Env Convex : `npx convex env set CLERK_WEBHOOK_SECRET <secret>`
+2. Dashboard Clerk → Webhooks → ajouter `https://<deployment>.convex.cloud/clerk-webhook` avec l'event `user.created`
+
+---
+
 ## Points d'attention
 
-1. **Décalage UTC vs local pour les défis** : le cron génère les défis en date UTC, le client envoie sa date locale. Si l'utilisateur est en UTC+8, il peut demander des défis pour "2026-03-16" alors que le cron a généré pour "2026-03-15". La liste sera vide jusqu'au prochain cron. Acceptable pour le POC.
+1. **Décalage UTC vs local pour les défis** : le cron génère les défis en date UTC, le client envoie sa date locale. Si l'utilisateur est en UTC+8, il peut demander des défis pour "2026-03-16" alors que le cron a généré pour "2026-03-15". La liste sera vide jusqu'au prochain cron. Acceptable pour le POC. Le webhook `initNewUser` génère en UTC également.
 
 2. **`addSessionPoints` silencieux si non authentifié** : si `sendMessage` est appelé sans JWT valide, la fonction return silencieusement sans crash. Les points ne sont pas attribués.
 
-3. **userId via `identity.subject`** : cohérent avec l'existant (`getOrCreateThread`). Les règles Convex recommandent `tokenIdentifier` pour plus de robustesse multi-provider — à migrer si on ajoute d'autres providers d'auth.
+3. **userId via `identity.subject`** : cohérent avec l'existant. Les règles Convex recommandent `tokenIdentifier` pour plus de robustesse multi-provider — à migrer si on ajoute d'autres providers d'auth.
 
-4. **Le cron itère `userStats` pour trouver les users actifs** : un user n'apparaît dans `userStats` qu'après son premier `sendMessage`. → voir prochaine section.
+4. **Validation IA — fallback optimiste** : si `generateText` retourne un JSON invalide (rare), le défi est approuvé automatiquement (`{ approved: true, message: "Challenge validated!" }`). On préfère ne pas bloquer l'utilisateur sur un bug de parsing.
+
+5. **`generateObject` évité pour la validation** : `generateObject` avec Anthropic lève `AI_NoObjectGeneratedError` si la réponse dépasse les contraintes Zod (ex: message > 200 chars). On utilise `generateText` + parse manuel pour plus de robustesse.
+
+6. **Pas de re-vérification ownership dans `completeDailyChallengeInternal`** : l'action appelante (`validateAndCompleteDailyChallenge`) vérifie l'auth et récupère l'identity. La mutation interne fait confiance à ces paramètres — ne jamais l'exposer en mutation publique.
 
 ---
 
@@ -183,43 +236,6 @@ pnpm test:convex:watch  # watch mode
 
 ## Travail en cours / Prochaines étapes
 
-### 🔴 Prioritaire : Webhook Clerk → initialisation user
-
-**Problème :** Actuellement, un user n'existe dans `userStats` (et donc ne reçoit pas de défis quotidiens) que s'il a déjà envoyé un message vocal. Les utilisateurs nouveaux n'ont pas de ligne dans `userStats`.
-
-**Solution :** Ajouter un **HTTP endpoint Convex** (`convex/http.ts`) qui écoute le webhook Clerk `user.created` :
-- Vérifie la signature Svix (header `svix-signature`)
-- Crée une ligne `userStats` avec valeurs à zéro pour ce `userId`
-- Optionnellement : crée les défis du jour pour ce nouvel utilisateur
-
-**Pattern à implémenter :**
-```ts
-// convex/http.ts
-import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
-import { Webhook } from "svix"; // vérification signature Clerk
-
-const http = httpRouter();
-
-http.route({
-  path: "/clerk-webhook",
-  method: "POST",
-  handler: httpAction(async (ctx, req) => {
-    // 1. Vérifier signature Svix
-    // 2. Parser le body JSON
-    // 3. Si type === "user.created" → ctx.runMutation(internal.gamification.initUserStats, { userId })
-    return new Response(null, { status: 200 });
-  }),
-});
-
-export default http;
-```
-
-À configurer dans le dashboard Clerk : ajouter l'URL `https://<deployment>.convex.cloud/clerk-webhook` avec l'event `user.created`.
-
-### 🟡 Suivant : Polish UI Focus Screen
-
-- Radar chart pour les scores de projet (4 dimensions, poids visuels)
 - Indicateur badge sur le tab Focus si défis non complétés aujourd'hui
 - Bouton "Ajouter un objectif" (appelle `useAddGoal`)
 - Animation de complétion sur les défis/objectifs

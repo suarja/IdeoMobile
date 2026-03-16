@@ -1,5 +1,5 @@
 import type { Id } from '../../../convex/_generated/dataModel';
-import { useConvexAuth, useMutation, useQuery } from 'convex/react';
+import { useAction, useConvexAuth, useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 
 // Auth-dependent queries MUST use 'skip' until Convex auth is established.
@@ -9,7 +9,11 @@ import { api } from '../../../convex/_generated/api';
 
 export function useActiveThreadId() {
   const { isAuthenticated } = useConvexAuth();
-  return useQuery(api.chat.getActiveThread, isAuthenticated ? {} : 'skip');
+  const result = useQuery(api.chat.getActiveThread, isAuthenticated ? {} : 'skip');
+  // Return just the threadId string (or null/undefined) for backwards compatibility
+  if (result === undefined || result === null)
+    return result;
+  return result.threadId;
 }
 
 export function useUserStats() {
@@ -43,6 +47,10 @@ export function useProjectGoals(threadId: string | null) {
 
 export function useCompleteDailyChallenge() {
   return useMutation(api.gamification.completeDailyChallenge);
+}
+
+export function useValidateAndCompleteDailyChallenge() {
+  return useAction(api.gamification.validateAndCompleteDailyChallenge);
 }
 
 export function useCompleteGoal() {

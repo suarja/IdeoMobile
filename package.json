@@ -101,6 +101,7 @@
     "react-native-url-polyfill": "^3.0.0",
     "react-native-web": "~0.19.13",
     "react-query-kit": "^3.3.2",
+    "svix": "^1.88.0",
     "tailwind-merge": "^3.4.0",
     "tailwind-variants": "^3.2.2",
     "uniwind": "^1.2.4",

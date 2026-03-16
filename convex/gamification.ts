@@ -1,10 +1,16 @@
 import type { MutationCtx, QueryCtx } from './_generated/server';
+import { anthropic } from '@ai-sdk/anthropic';
+import { generateText } from 'ai';
 import { v } from 'convex/values';
+import { internal } from './_generated/api';
 import {
+  action,
   internalMutation,
+  internalQuery,
   mutation,
   query,
 } from './_generated/server';
+import { pickRandom, SYSTEM_CHALLENGE_POOL, utcDateString } from './challenges';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -417,6 +423,156 @@ export const addGoalInternal = internalMutation({
       completed: false,
       createdBy: 'agent',
       createdAt: Date.now(),
+    });
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Validation agent
+// ---------------------------------------------------------------------------
+
+export const getDailyChallengeById = internalQuery({
+  args: { challengeId: v.id('dailyChallenges') },
+  handler: async (ctx, { challengeId }) => ctx.db.get(challengeId),
+});
+
+export const completeDailyChallengeInternal = internalMutation({
+  args: { challengeId: v.id('dailyChallenges'), userId: v.string() },
+  handler: async (ctx, { challengeId, userId }) => {
+    const challenge = await ctx.db.get(challengeId);
+    if (!challenge || challenge.completed)
+      return;
+    await ctx.db.patch(challengeId, { completed: true, completedAt: Date.now() });
+    await grantPoints(ctx, userId, challenge.points);
+  },
+});
+
+export const validateAndCompleteDailyChallenge = action({
+  args: {
+    challengeId: v.id('dailyChallenges'),
+    threadId: v.string(),
+  },
+  handler: async (ctx, { challengeId, threadId }): Promise<{ approved: boolean; message: string }> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      throw new Error('Unauthenticated');
+
+    const challenge: { label: string; points: number; completed: boolean } | null = await ctx.runQuery(
+      internal.gamification.getDailyChallengeById,
+      { challengeId },
+    );
+    if (!challenge)
+      throw new Error('Challenge not found');
+    if (challenge.completed)
+      return { approved: true, message: 'Already completed!' };
+
+    const messages: Array<{ role: string; content: string }> = await ctx.runQuery(
+      internal.chat.listMessagesInternal,
+      { threadId },
+    );
+    const history = messages.map(m => `${m.role}: ${m.content}`).join('\n');
+
+    const { text } = await generateText({
+      model: anthropic('claude-haiku-4-5-20251001'),
+      prompt: `Based on this conversation, did the user complete the challenge: "${challenge.label}"?
+
+Conversation:
+${history || '(no messages yet)'}
+
+Reply with valid JSON only, no markdown, no extra text:
+{"approved": true/false, "message": "1-2 sentence explanation"}
+
+Be lenient: if the conversation shows any attempt toward the challenge, approve it.`,
+    });
+
+    let result: { approved: boolean; message: string };
+    try {
+      const raw = text.trim().replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+      const parsed = JSON.parse(raw) as { approved?: unknown; message?: unknown };
+      result = {
+        approved: parsed.approved === true,
+        message: typeof parsed.message === 'string' ? parsed.message : 'Validation complete.',
+      };
+    }
+    catch {
+      // If parsing fails, approve optimistically so users aren't blocked
+      result = { approved: true, message: 'Challenge validated!' };
+    }
+
+    if (result.approved) {
+      await ctx.runMutation(internal.gamification.completeDailyChallengeInternal, {
+        challengeId,
+        userId: identity.subject,
+      });
+    }
+
+    return result;
+  },
+});
+
+// ---------------------------------------------------------------------------
+// User initialization
+// ---------------------------------------------------------------------------
+
+export const initNewUser = internalMutation({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const existing = await ctx.db
+      .query('userStats')
+      .withIndex('by_userId', q => q.eq('userId', userId))
+      .first();
+    if (!existing) {
+      await ctx.db.insert('userStats', {
+        userId,
+        totalPoints: 0,
+        currentLevel: 1,
+        currentStreak: 0,
+        longestStreak: 0,
+        lastSessionAt: 0,
+      });
+    }
+
+    const date = utcDateString();
+    const count = 3 + Math.floor(Math.random() * 2); // 3 or 4
+    const picked = pickRandom(SYSTEM_CHALLENGE_POOL, count);
+
+    await ctx.runMutation(internal.gamification.insertDailyChallengesForUser, {
+      userId,
+      date,
+      challenges: picked.map(c => ({
+        label: c.label,
+        points: c.points,
+        ...(c.dimension !== undefined ? { dimension: c.dimension } : {}),
+      })),
+    });
+  },
+});
+
+// ---------------------------------------------------------------------------
+// ProjectScores initialization
+// ---------------------------------------------------------------------------
+
+export const initProjectScores = internalMutation({
+  args: { threadId: v.string(), userId: v.string() },
+  handler: async (ctx, { threadId, userId }) => {
+    const existing = await ctx.db
+      .query('projectScores')
+      .withIndex('by_threadId', q => q.eq('threadId', threadId))
+      .first();
+    if (existing)
+      return;
+    await ctx.db.insert('projectScores', {
+      userId,
+      threadId,
+      validationScore: 0,
+      designScore: 0,
+      developmentScore: 0,
+      distributionScore: 0,
+      validationWeight: 1.0,
+      designWeight: 1.0,
+      developmentWeight: 1.0,
+      distributionWeight: 1.0,
+      updatedAt: Date.now(),
     });
   },
 });
