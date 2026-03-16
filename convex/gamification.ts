@@ -480,7 +480,7 @@ Conversation:
 ${history || '(no messages yet)'}
 
 Reply with valid JSON only, no markdown, no extra text:
-{"approved": true/false, "message": "1-2 sentence explanation"}
+{"approved": true/false, "message": "1-2 sentence explanation (talk to the user, be encouraging, and if rejected, give hints on what they might have missed. You might assume that all the conversations are voice-based)."}
 
 Be lenient: if the conversation shows any attempt toward the challenge, approve it.`,
     });

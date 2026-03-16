@@ -1,5 +1,6 @@
 import type { DailyChallenge, ProjectGoal } from './api';
 
+import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
 import { ActivityIndicator, Modal, TouchableOpacity } from 'react-native';
 
@@ -11,10 +12,14 @@ import {
   useDailyChallenges,
   useProjectGoals,
   useProjectScores,
+  useUserStats,
   useValidateAndCompleteDailyChallenge,
 } from './api';
 import { LevelHeader } from './components/level-header';
+import { LevelUpModal } from './components/level-up-modal';
 import { RadarChart } from './components/radar-chart';
+import { SparkBurst } from './components/spark-burst';
+import { useLevelUpDetection } from './hooks/use-level-up-detection';
 
 const DIMENSION_COLORS: Record<string, string> = {
   validation: colors.success[500],
@@ -50,43 +55,64 @@ function ChallengeRow({
   onComplete: (result: { approved: boolean; message: string }) => void;
 }) {
   const [validating, setValidating] = useState(false);
+  // Delay spinner so sparks play first (600ms)
+  const [showSpinner, setShowSpinner] = useState(false);
+  const [sparkTrigger, setSparkTrigger] = useState(false);
   const validate = useValidateAndCompleteDailyChallenge();
 
   const handlePress = async () => {
     if (item.completed || validating)
       return;
+    // Fire-and-forget — never await haptics (may hang if native module not ready)
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setSparkTrigger(true);
+    setTimeout(() => setSparkTrigger(false), 900);
     setValidating(true);
+    // Delay spinner so sparks play unobstructed
+    const spinnerTimer = setTimeout(() => setShowSpinner(true), 600);
     try {
       const result = await validate({ challengeId: item._id, threadId });
       onComplete(result ?? { approved: false, message: 'Validation failed.' });
     }
     finally {
+      clearTimeout(spinnerTimer);
       setValidating(false);
+      setShowSpinner(false);
     }
   };
 
   return (
     <View className="flex-row items-center border-b py-3" style={{ borderColor: colors.brand.border }}>
-      <TouchableOpacity
-        onPress={handlePress}
-        disabled={validating || item.completed}
-        style={{
-          width: 18,
-          height: 18,
-          borderRadius: 9,
-          borderWidth: 1.5,
-          borderColor: colors.brand.dark,
-          backgroundColor: item.completed ? colors.brand.dark : 'transparent',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {validating
-          ? <ActivityIndicator size="small" color={colors.brand.dark} />
-          : item.completed
-            ? <Text style={{ fontSize: 11, color: colors.white }}>✓</Text>
-            : null}
-      </TouchableOpacity>
+      {/* Checkbox with overflow visible for spark burst */}
+      <View style={{ overflow: 'visible' }}>
+        <TouchableOpacity
+          onPress={handlePress}
+          disabled={validating || item.completed}
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: 11,
+            borderWidth: 1.5,
+            borderColor: colors.brand.dark,
+            backgroundColor: item.completed ? colors.brand.dark : 'transparent',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {showSpinner
+            ? <ActivityIndicator size="small" color={colors.brand.dark} />
+            : item.completed
+              ? <Text style={{ fontSize: 13, color: colors.white }}>✓</Text>
+              : null}
+        </TouchableOpacity>
+        <SparkBurst
+          trigger={sparkTrigger}
+          color={colors.primary[500]}
+          count={8}
+          size={6}
+          radius={30}
+        />
+      </View>
       <Text
         className="flex-1 px-3"
         style={{
@@ -263,6 +289,9 @@ function ProjectGoalsSection() {
 export function FocusScreen() {
   const threadId = useActiveThreadId();
   const scores = useProjectScores(threadId ?? null);
+  const stats = useUserStats();
+  const { showModal, levelUpData, dismiss } = useLevelUpDetection(stats);
+
   return (
     <View className="flex-1" style={{ backgroundColor: colors.brand.bg }}>
       <FocusAwareStatusBar />
@@ -271,12 +300,21 @@ export function FocusScreen() {
           <Text className="mb-6 text-2xl font-bold" style={{ color: colors.brand.dark }}>
             Focus
           </Text>
-          <LevelHeader />
+          <LevelHeader stats={stats} />
           <RadarChart scores={scores} />
           <DailyChallengesSection />
           <ProjectGoalsSection />
         </View>
       </ScrollView>
+      {levelUpData && (
+        <LevelUpModal
+          visible={showModal}
+          newLevel={levelUpData.newLevel}
+          newLevelName={levelUpData.newLevelName}
+          newLevelIcon={levelUpData.newLevelIcon}
+          onDismiss={dismiss}
+        />
+      )}
     </View>
   );
 }
