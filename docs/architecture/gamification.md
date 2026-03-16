@@ -156,6 +156,31 @@ Les 3 jauges circulaires sont mappées :
 
 ---
 
+## Tests
+
+**Runner :** Vitest + `convex-test` (edge-runtime). Fichier : `convex/gamification.test.ts`.
+
+```bash
+pnpm test:convex        # run (CI)
+pnpm test:convex:watch  # watch mode
+```
+
+**Couverture (12 tests) :**
+
+| Suite | Cas testés |
+|---|---|
+| `addSessionPoints` | Première session (60 pts), streak 48h incrémente, streak reset >48h, bonus plafonné à 50 |
+| `completeDailyChallenge` | Idempotence (2e complétion = 0 pts extra), rejet si non authentifié |
+| `completeGoal` | Idempotence (2e complétion = 0 pts extra) |
+| `insertDailyChallengesForUser` | Insertion 3 défis, anti-doublon (2e appel = rien) |
+| `getUserStats` | Valeurs par défaut si user sans row |
+| `getDailyChallenges` | Isolation par userId (pas les défis d'un autre user) |
+| `getProjectGoals` | Isolation par threadId |
+
+**Pattern :** chaque test crée un contexte isolé via `makeT()` (`convexTest(schema, modules)`). Les seeds se font via `t.run(async ctx => ...)`. L'auth est simulée via `t.withIdentity({ subject: "user_id" })`.
+
+---
+
 ## Travail en cours / Prochaines étapes
 
 ### 🔴 Prioritaire : Webhook Clerk → initialisation user
