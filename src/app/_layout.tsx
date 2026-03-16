@@ -20,7 +20,7 @@ import '@/lib/polyfills';
 import '../global.css';
 
 const convex = new ConvexReactClient(Env.EXPO_PUBLIC_CONVEX_URL, {
-  verbose: __DEV__,
+  // verbose: __DEV__,
 });
 const publishableKey = Env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 
@@ -73,7 +73,7 @@ function useAuth() {
     async (options?: { template?: string; skipCache?: boolean }) => {
       const token = await getTokenRef.current(options);
       if (__DEV__) {
-        console.log('[auth-wrapper] getToken →', token ? `token(${token.length}ch)` : '⚠️ NULL', JSON.stringify(options));
+        // console.log('[auth-wrapper] getToken →', token ? `token(${token.length}ch)` : '⚠️ NULL', JSON.stringify(options));
       }
       return token;
     },
@@ -99,15 +99,15 @@ function useAuth() {
       || raw.orgId !== prevRaw.current.orgId
       || raw.sessionId !== prevRaw.current.sessionId;
     if (changed) {
-      console.log('[auth-wrapper] RAW Clerk transition:', prevRaw.current, '→', raw);
+      // console.log('[auth-wrapper] RAW Clerk transition:', prevRaw.current, '→', raw);
       if (!raw.isLoaded && stableIsLoaded.current) {
-        console.log('[auth-wrapper] ⛔ BLOCKED isLoaded=false (would change authProviderLoading → clearAuth)');
+        // console.log('[auth-wrapper] ⛔ BLOCKED isLoaded=false (would change authProviderLoading → clearAuth)');
       }
       if (raw.isSignedIn === undefined && stableIsSignedIn.current !== undefined) {
-        console.log('[auth-wrapper] ⛔ BLOCKED isSignedIn=undefined (would set authProviderAuthenticated=false → clearAuth)');
+        // console.log('[auth-wrapper] ⛔ BLOCKED isSignedIn=undefined (would set authProviderAuthenticated=false → clearAuth)');
       }
       if (raw.orgId === undefined && stableOrgId.current !== undefined) {
-        console.log('[auth-wrapper] ⛔ BLOCKED orgId=undefined (would recreate fetchAccessToken → clearAuth)');
+        // console.log('[auth-wrapper] ⛔ BLOCKED orgId=undefined (would recreate fetchAccessToken → clearAuth)');
       }
     }
     prevRaw.current = raw;
