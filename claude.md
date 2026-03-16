@@ -18,7 +18,9 @@ pnpm android            # Run on Android
 pnpm lint               # ESLint (flat config)
 pnpm lint:fix           # ESLint auto-fix
 pnpm type-check         # tsc --noemit
-pnpm test               # Jest
+pnpm test               # Jest (src/ only — React Native components)
+pnpm test:convex        # Vitest (convex/ — backend gamification logic)
+pnpm test:convex:watch  # Vitest watch mode
 pnpm check-all          # lint + type-check + lint:translations + test
 
 pnpm test -- path/to/file                     # Single test file
@@ -64,7 +66,19 @@ The project uses `@expo/ui` (canary) — a set of native iOS/Android components.
 
 ### Testing
 
-Jest with `jest-expo` preset. Test helper in `src/lib/test-utils.tsx` provides `render` (with all providers) and `setup` (for user events). Tests are co-located with source files using `.test.tsx`. Native module mocks in `jest-setup.ts`.
+Two separate test runners coexist:
+
+**Jest** (`pnpm test`) — React Native components in `src/`
+- Preset: `jest-expo`. Scoped to `<rootDir>/src/**/*.test.{ts,tsx}`.
+- Test helper in `src/lib/test-utils.tsx`: `render` (with all providers) + `setup` (user events).
+- Tests co-located with source files. Native module mocks in `jest-setup.ts`.
+
+**Vitest** (`pnpm test:convex`) — Convex backend in `convex/`
+- Runner: `vitest` with `@edge-runtime/vm` environment (matches Convex's edge runtime).
+- Library: `convex-test` — provides `convexTest(schema, modules)` for in-process DB.
+- Config: `vitest.config.ts` at root, project `convex-tests`, scoped to `convex/**/*.test.ts`.
+- Coverage: `convex/gamification.test.ts` — 12 tests for points/streaks, idempotence, daily challenge dedup, queries.
+- Use `t.withIdentity({ subject: "user_id" })` to simulate auth in tests.
 
 ### i18n
 
