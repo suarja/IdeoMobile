@@ -11,6 +11,8 @@ import {
 import { Github, Rate, Share, Support, Website } from '@/components/ui/icons';
 import { translate } from '@/lib/i18n';
 import { LanguageItem } from './components/language-item';
+import { MemoryItem } from './components/memory-bottom-sheet';
+import { ProjectsItem } from './components/projects-bottom-sheet';
 import { SettingsContainer } from './components/settings-container';
 import { SettingsItem } from './components/settings-item';
 import { WhisperModelItem } from './components/whisper-model-item';
@@ -55,6 +57,11 @@ export function SettingsScreen() {
 
           <SettingsContainer title="settings.voice_model">
             <WhisperModelItem />
+          </SettingsContainer>
+
+          <SettingsContainer title="settings.agent">
+            <MemoryItem />
+            <ProjectsItem />
           </SettingsContainer>
 
           <SettingsContainer title="settings.about">

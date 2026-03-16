@@ -23,6 +23,11 @@
   },
   "settings": {
     "about": "About",
+    "active_badge": "active",
+    "agent": "Agent",
+    "agent_memory": "Agent Memory",
+    "agent_memory_empty": "No memory yet. Start a voice standup!",
+    "agent_projects": "Projects",
     "app_name": "App Name",
     "arabic": "Arabic",
     "english": "English",
@@ -31,8 +36,11 @@
     "language": "Language",
     "links": "Links",
     "logout": "Logout",
+    "memory_delete_confirm": "Delete this memory fragment?",
     "more": "More",
+    "no_name_project": "Unnamed project",
     "privacy": "Privacy Policy",
+    "project_memory_section": "Project",
     "rate": "Rate",
     "share": "Share",
     "support": "Support",
@@ -45,6 +53,7 @@
       "title": "Theme"
     },
     "title": "Settings",
+    "user_memory_section": "Profile",
     "version": "Version",
     "voice_model": "Voice Model",
     "website": "Website"

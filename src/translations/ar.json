@@ -23,6 +23,11 @@
   },
   "settings": {
     "about": "حول التطبيق ",
+    "active_badge": "نشط",
+    "agent": "المساعد",
+    "agent_memory": "ذاكرة المساعد",
+    "agent_memory_empty": "لا توجد ذاكرة بعد. ابدأ جلسة صوتية!",
+    "agent_projects": "المشاريع",
     "app_name": "اسم التطبيق",
     "arabic": "عربي",
     "english": "إنجليزي",
@@ -31,8 +36,11 @@
     "language": "لغة",
     "links": "الروابط",
     "logout": "تسجيل خروج",
+    "memory_delete_confirm": "حذف هذه الذاكرة؟",
     "more": "أكثر",
+    "no_name_project": "مشروع بلا اسم",
     "privacy": "سياسة الخصوصية",
+    "project_memory_section": "المشروع",
     "rate": "تقييم",
     "share": "شارك",
     "support": "الدعم",
@@ -45,6 +53,7 @@
       "title": "سمة"
     },
     "title": "إعدادات",
+    "user_memory_section": "الملف الشخصي",
     "version": "إصدار",
     "voice_model": "نموذج الصوت",
     "website": "موقع الكتروني"
