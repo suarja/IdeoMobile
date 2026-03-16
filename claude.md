@@ -116,6 +116,7 @@ Des incidents résolus sont consignés dans `docs/bugs/` pour éviter les régre
 | Fichier | Système | Résumé |
 |---------|---------|--------|
 | [`docs/bugs/whisper-realtime-capturing-bug.md`](docs/bugs/whisper-realtime-capturing-bug.md) | `use-voice-recording.ts` / Whisper STT | Ne jamais utiliser `Promise.race()` avec timeout pour stopper Whisper — laisse le contexte en état zombie qui bloque toute nouvelle capture |
+| [`docs/bugs/clerk-navigator-online-bug.md`](docs/bugs/clerk-navigator-online-bug.md) | `src/app/_layout.tsx` / Clerk + Convex | `navigator.onLine` est `undefined` en React Native → Clerk croit être offline → `ClerkOfflineError` → `clearAuth()` → données disparaissent ~15s après login. Fix : polyfill en tête de `_layout.tsx`. Ne jamais supprimer la stability wrapper `useAuth()` ni le pattern `'skip'` sur les queries Convex. |
 
 ## Template Docs
 

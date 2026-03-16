@@ -85,6 +85,46 @@ const userId = identity.subject; // ID Clerk : "user_xxx"
 | `convex/auth.config.ts` | Déclare Clerk comme provider Convex (domain + applicationID) |
 | `convex/chat.ts` | Exemple d'usage de `ctx.auth.getUserIdentity()` dans `getOrCreateThread` |
 
+## Stabilisation auth — défenses critiques
+
+### Polyfill `navigator.onLine` (root cause fix)
+
+React Native n'implémente pas `navigator.onLine`. Clerk l'utilise pour détecter la connectivité — `undefined` est interprété comme "offline". Résultat : `getToken({ skipCache: true })` échoue avec `ClerkOfflineError` après ~15s (3 tentatives × backoff exponentiel), ce qui déclenche `clearAuth()` dans Convex et efface toutes les données auth-dépendantes.
+
+**Fix :** polyfill en tête de `src/app/_layout.tsx`, *avant* tout import Clerk :
+
+```ts
+if (typeof navigator !== 'undefined' && navigator.onLine === undefined) {
+  Object.defineProperty(navigator, 'onLine', { get: () => true, configurable: true });
+}
+```
+
+> Voir `docs/bugs/clerk-navigator-online-bug.md` pour la chaîne complète et les références dans node_modules.
+
+### Stability wrapper `useAuth()` (native session sync)
+
+Clerk v3 effectue un "native session sync" ~10-15s après login (`setActive()` interne). Pendant ce sync, plusieurs valeurs de `useAuth()` repassent brièvement à `undefined`, ce qui déclenche `clearAuth()` dans `ConvexAuthState` via 4 chemins distincts.
+
+La stability wrapper dans `src/app/_layout.tsx` (lignes ~55-136) stabilise ces valeurs via `useRef` — une fois passée à une valeur définie, elle ne revient jamais à `undefined`. Elle est branchée sur `ConvexProviderWithClerk` via `useAuth={useAuth}`.
+
+**Ne jamais supprimer ou contourner cette wrapper.** Sans elle, les données disparaissent même avec le polyfill.
+
+### Pattern `'skip'` pour les queries auth-dépendantes
+
+```ts
+const { isAuthenticated } = useConvexAuth();
+return useQuery(api.xxx.yyy, isAuthenticated ? { ...args } : 'skip');
+```
+
+Sans ce pattern, la query se subscribe avant que le token arrive sur le serveur → exécution sans auth → throw → la subscription meurt définitivement.
+
+Les handlers Convex doivent retourner une valeur vide (jamais throw) pour les gaps transitoires :
+
+```ts
+const identity = await ctx.auth.getUserIdentity();
+if (!identity) return []; // Pas throw — la subscription reste vivante et se réévalue
+```
+
 ## Dépendances natives — rebuild obligatoire si modifiées
 
 Les packages suivants contiennent du code natif. Tout changement de version nécessite `npx expo prebuild --clean` + rebuild :
