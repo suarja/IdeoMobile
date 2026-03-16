@@ -10,6 +10,20 @@ import { chatAgent } from './agents/chatAgent';
 export const getOrCreateThread = mutation({
   args: {},
   handler: async (ctx): Promise<string> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      throw new Error('Unauthenticated');
+    const userId = identity.subject;
+
+    // Return existing active project if one exists (preserves "get or create" semantics)
+    const activeProject = await ctx.db
+      .query('projects')
+      .withIndex('by_userId_active', q => q.eq('userId', userId).eq('isActive', true))
+      .first();
+    if (activeProject)
+      return activeProject.threadId;
+
+    // No active project → create one
     const result = await ctx.runMutation(internal.projects.createProjectAndThread, {});
     return result.threadId;
   },
