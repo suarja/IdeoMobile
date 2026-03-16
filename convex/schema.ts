@@ -85,4 +85,37 @@ export default defineSchema({
   })
     .index('by_threadId', ['threadId'])
     .index('by_userId', ['userId']),
+
+  // --- Projects & Memory ---
+
+  projects: defineTable({
+    userId: v.string(),
+    name: v.optional(v.string()),
+    threadId: v.string(),
+    isActive: v.boolean(),
+    status: v.union(v.literal('active'), v.literal('paused'), v.literal('abandoned')),
+    createdAt: v.number(),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_threadId', ['threadId'])
+    .index('by_userId_active', ['userId', 'isActive']),
+
+  userMemory: defineTable({
+    userId: v.string(),
+    key: v.string(),
+    value: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_userId_key', ['userId', 'key']),
+
+  projectMemory: defineTable({
+    projectId: v.id('projects'),
+    userId: v.string(),
+    key: v.string(),
+    value: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_projectId', ['projectId'])
+    .index('by_projectId_key', ['projectId', 'key']),
 });
