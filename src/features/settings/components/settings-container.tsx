@@ -23,7 +23,7 @@ export function SettingsContainer({ children, title }: Props) {
       <View
         className="overflow-hidden rounded-xl"
         style={{
-          backgroundColor: '#FBF6EE',
+          backgroundColor: colors.brand.card,
           borderWidth: 1,
           borderColor: colors.brand.border,
         }}
