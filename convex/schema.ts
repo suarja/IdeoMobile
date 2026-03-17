@@ -95,6 +95,7 @@ export default defineSchema({
     isActive: v.boolean(),
     status: v.union(v.literal('active'), v.literal('paused'), v.literal('abandoned')),
     createdAt: v.number(),
+    validationSearchCount: v.optional(v.number()),
   })
     .index('by_userId', ['userId'])
     .index('by_threadId', ['threadId'])

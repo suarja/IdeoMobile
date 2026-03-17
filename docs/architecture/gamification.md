@@ -151,17 +151,40 @@ ChallengeRow onPress → useValidateAndCompleteDailyChallenge (action)
 
 ## Outils Agent (tool use)
 
-L'agent peut appeler deux outils dans `sendMessage` via AI SDK (`tool` + `inputSchema`) :
+Les agents peuvent appeler 11 outils communs dans `sendMessage` via AI SDK (`tool` + `inputSchema`) :
 
 ```ts
+// Écriture projet / gamification
 updateProjectScores({ validation?, design?, development?, distribution? })
 // → internal.gamification.updateProjectScores
-// → met à jour les scores radar 0-100 du projet courant
 
 addGoal({ title, points, dimension? })
 // → internal.gamification.addGoalInternal
-// → crée un objectif de projet sans dépendre de l'auth client
+
+// Mémoire
+saveUserMemory({ key, value })      // → internal.memory.upsertUserMemory
+saveProjectMemory({ key, value })   // → internal.memory.upsertProjectMemory
+deleteMemory({ scope, key })        // → internal.memory.deleteMemoryFragment
+
+// Session
+recordVoiceSession({ summary })     // → addSessionPoints + upsertProjectMemory
+
+// Lecture gamification (nouveaux)
+readDailyChallenges()               // → internal.gamification.getDailyChallengesInternal
+completeDailyChallenge({ challengeId }) // → internal.gamification.completeDailyChallengeInternal
+createDailyChallenge({ label, points, dimension? }) // → internal.gamification.createDailyChallengeInternal
+readUserStats()                     // → internal.gamification.getUserStatsInternal
+readProjectScores()                 // → internal.gamification.getProjectScoresInternal
 ```
+
+**Outil spécialisé (validationAgent + distributionAgent) :**
+```ts
+triggerValidationSearch({ query, ideaSummary })
+// → webSearch() avec quota (1/projet, 4/mois)
+// → internal.projects.incrementValidationSearchCount
+```
+
+Pour l'architecture complète du système multi-agent, voir `docs/architecture/agents.md`.
 
 ---
 

@@ -612,3 +612,75 @@ export const insertDailyChallengesForUser = internalMutation({
     }
   },
 });
+
+// ---------------------------------------------------------------------------
+// Internal agent tools — read-only accessors
+// ---------------------------------------------------------------------------
+
+export const getDailyChallengesInternal = internalQuery({
+  args: { userId: v.string(), date: v.string() },
+  handler: async (ctx, { userId, date }) => {
+    return ctx.db
+      .query('dailyChallenges')
+      .withIndex('by_userId_date', q => q.eq('userId', userId).eq('date', date))
+      .take(10);
+  },
+});
+
+export const getUserStatsInternal = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const stats = await ctx.db
+      .query('userStats')
+      .withIndex('by_userId', q => q.eq('userId', userId))
+      .first();
+    if (!stats)
+      return null;
+    return {
+      totalPoints: stats.totalPoints,
+      currentLevel: stats.currentLevel,
+      currentStreak: stats.currentStreak,
+      longestStreak: stats.longestStreak,
+      lastSessionAt: stats.lastSessionAt,
+    };
+  },
+});
+
+export const getProjectScoresInternal = internalQuery({
+  args: { threadId: v.string() },
+  handler: async (ctx, { threadId }) => {
+    const scores = await ctx.db
+      .query('projectScores')
+      .withIndex('by_threadId', q => q.eq('threadId', threadId))
+      .first();
+    if (!scores)
+      return null;
+    return {
+      validation: scores.validationScore,
+      design: scores.designScore,
+      development: scores.developmentScore,
+      distribution: scores.distributionScore,
+    };
+  },
+});
+
+export const createDailyChallengeInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    label: v.string(),
+    points: v.number(),
+    dimension: v.optional(v.string()),
+    date: v.string(),
+  },
+  handler: async (ctx, { userId, label, points, dimension, date }) => {
+    return ctx.db.insert('dailyChallenges', {
+      userId,
+      date,
+      challengeType: 'agent',
+      label,
+      dimension,
+      points,
+      completed: false,
+    });
+  },
+});

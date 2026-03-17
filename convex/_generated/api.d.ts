@@ -9,6 +9,11 @@
  */
 
 import type * as agents_chatAgent from "../agents/chatAgent.js";
+import type * as agents_designAgent from "../agents/designAgent.js";
+import type * as agents_developmentAgent from "../agents/developmentAgent.js";
+import type * as agents_distributionAgent from "../agents/distributionAgent.js";
+import type * as agents_routerAgent from "../agents/routerAgent.js";
+import type * as agents_validationAgent from "../agents/validationAgent.js";
 import type * as appConfig from "../appConfig.js";
 import type * as challenges from "../challenges.js";
 import type * as chat from "../chat.js";
@@ -18,6 +23,10 @@ import type * as http from "../http.js";
 import type * as memory from "../memory.js";
 import type * as playground from "../playground.js";
 import type * as projects from "../projects.js";
+import type * as tools_webSearch_anthropicNative from "../tools/webSearch/anthropicNative.js";
+import type * as tools_webSearch_index from "../tools/webSearch/index.js";
+import type * as tools_webSearch_perplexity from "../tools/webSearch/perplexity.js";
+import type * as tools_webSearch_tavily from "../tools/webSearch/tavily.js";
 import type * as userProfiles from "../userProfiles.js";
 
 import type {
@@ -28,6 +37,11 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "agents/chatAgent": typeof agents_chatAgent;
+  "agents/designAgent": typeof agents_designAgent;
+  "agents/developmentAgent": typeof agents_developmentAgent;
+  "agents/distributionAgent": typeof agents_distributionAgent;
+  "agents/routerAgent": typeof agents_routerAgent;
+  "agents/validationAgent": typeof agents_validationAgent;
   appConfig: typeof appConfig;
   challenges: typeof challenges;
   chat: typeof chat;
@@ -37,6 +51,10 @@ declare const fullApi: ApiFromModules<{
   memory: typeof memory;
   playground: typeof playground;
   projects: typeof projects;
+  "tools/webSearch/anthropicNative": typeof tools_webSearch_anthropicNative;
+  "tools/webSearch/index": typeof tools_webSearch_index;
+  "tools/webSearch/perplexity": typeof tools_webSearch_perplexity;
+  "tools/webSearch/tavily": typeof tools_webSearch_tavily;
   userProfiles: typeof userProfiles;
 }>;
 

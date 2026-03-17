@@ -1,11 +1,35 @@
 import type { Id } from './_generated/dataModel';
+import type { AgentType } from './agents/routerAgent';
 import { anthropic } from '@ai-sdk/anthropic';
 import { generateText, tool } from 'ai';
 import { v } from 'convex/values';
 import { z } from 'zod';
 import { internal } from './_generated/api';
 import { action, internalAction, internalMutation, internalQuery, mutation, query } from './_generated/server';
-import { chatAgent } from './agents/chatAgent';
+import { generalAgent } from './agents/chatAgent';
+import { designAgent } from './agents/designAgent';
+import { developmentAgent } from './agents/developmentAgent';
+import { distributionAgent } from './agents/distributionAgent';
+import { routeMessage } from './agents/routerAgent';
+import { validationAgent } from './agents/validationAgent';
+import { utcDateString } from './challenges';
+import { webSearch } from './tools/webSearch/index';
+
+// ---------------------------------------------------------------------------
+// Agent registry
+// ---------------------------------------------------------------------------
+
+const SPECIALIST_AGENTS = {
+  general: generalAgent,
+  validation: validationAgent,
+  design: designAgent,
+  development: developmentAgent,
+  distribution: distributionAgent,
+} as const satisfies Record<AgentType, typeof generalAgent>;
+
+// ---------------------------------------------------------------------------
+// Thread management
+// ---------------------------------------------------------------------------
 
 export const getOrCreateThread = mutation({
   args: {},
@@ -64,7 +88,9 @@ export const insertMessage = internalMutation({
   },
 });
 
-// ---- Memory & prompt helpers ----
+// ---------------------------------------------------------------------------
+// Memory & prompt helpers
+// ---------------------------------------------------------------------------
 
 type MemEntry = { key: string; value: string };
 
@@ -97,10 +123,22 @@ function buildFullPrompt(content: string, memData: MemData, lastMsgCreatedAt: nu
 }
 
 type RunMutationFn = (ref: any, args: any) => Promise<any>;
+type RunQueryFn = (ref: any, args: any) => Promise<any>;
 
-function buildAgentTools(runMutation: RunMutationFn, threadId: string, memData: MemData) {
+// ---------------------------------------------------------------------------
+// Common tools (available to all agents)
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line max-params, max-lines-per-function
+function buildCommonTools(
+  runMutation: RunMutationFn,
+  runQuery: RunQueryFn,
+  threadId: string,
+  memData: MemData,
+) {
   const pid = memData?.projectId;
   const uid = memData?.userId ?? '';
+
   return {
     updateProjectScores: tool({
       description: 'Update the radar progress scores for the current project. Scores are 0-100 per dimension.',
@@ -184,10 +222,121 @@ function buildAgentTools(runMutation: RunMutationFn, threadId: string, memData: 
         return 'Session recorded.';
       },
     }),
+    readDailyChallenges: tool({
+      description: 'Read the user\'s daily challenges for today. Use to check progress and decide if any are completed.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        if (!uid)
+          return 'No user context.';
+        const challenges = await runQuery(internal.gamification.getDailyChallengesInternal, {
+          userId: uid,
+          date: utcDateString(),
+        });
+        return JSON.stringify(challenges);
+      },
+    }),
+    completeDailyChallenge: tool({
+      description: 'Mark a daily challenge as completed. Call when the conversation demonstrates the challenge is done.',
+      inputSchema: z.object({
+        challengeId: z.string().describe('The _id of the dailyChallenge document'),
+      }),
+      execute: async ({ challengeId }) => {
+        if (!uid)
+          return 'No user context.';
+        await runMutation(internal.gamification.completeDailyChallengeInternal, {
+          challengeId: challengeId as Id<'dailyChallenges'>,
+          userId: uid,
+        });
+        return 'Challenge completed. Points awarded.';
+      },
+    }),
+    createDailyChallenge: tool({
+      description: 'Create a custom challenge tailored to the current session context. Use to replace generic challenges with more relevant ones.',
+      inputSchema: z.object({
+        label: z.string().describe('Clear action-oriented challenge label'),
+        points: z.number().min(50).max(200),
+        dimension: z.enum(['validation', 'design', 'development', 'distribution']).optional(),
+      }),
+      execute: async ({ label, points, dimension }) => {
+        if (!uid)
+          return 'No user context.';
+        await runMutation(internal.gamification.createDailyChallengeInternal, {
+          userId: uid,
+          label,
+          points,
+          dimension,
+          date: utcDateString(),
+        });
+        return `Challenge "${label}" created.`;
+      },
+    }),
+    readUserStats: tool({
+      description: 'Read current user stats: points, level, streak. Use to personalize motivation.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        if (!uid)
+          return 'No user context.';
+        const stats = await runQuery(internal.gamification.getUserStatsInternal, { userId: uid });
+        return JSON.stringify(stats);
+      },
+    }),
+    readProjectScores: tool({
+      description: 'Read the current radar scores for the active project (0-100 per dimension).',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const scores = await runQuery(internal.gamification.getProjectScoresInternal, { threadId });
+        return JSON.stringify(scores);
+      },
+    }),
   };
 }
 
-// ---- sendMessage ----
+// ---------------------------------------------------------------------------
+// Specialized tools (per-agent additions)
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line max-params
+function buildSpecializedTools(
+  specialist: AgentType,
+  runMutation: RunMutationFn,
+  runQuery: RunQueryFn,
+  threadId: string,
+) {
+  if (specialist === 'validation' || specialist === 'distribution') {
+    return {
+      triggerValidationSearch: tool({
+        description: 'Launch a web search to validate the idea or research distribution channels. ONLY call when: (1) idea is well understood (ideaSummary in memory), (2) user has explicitly confirmed they want a search.',
+        inputSchema: z.object({
+          query: z.string().describe('Specific search query optimized for finding competitors or market data'),
+          ideaSummary: z.string().describe('1-sentence summary of the idea being validated'),
+        }),
+        execute: async ({ query, ideaSummary: _ideaSummary }) => {
+          const quota = await runQuery(internal.projects.getValidationSearchQuota, { threadId });
+          if ((quota as { projectCount: number; monthlyCount: number }).projectCount >= 1) {
+            return 'Search quota reached for this project (max 1 search/project).';
+          }
+          if ((quota as { projectCount: number; monthlyCount: number }).monthlyCount >= 4) {
+            return 'Monthly search quota reached (max 4/month).';
+          }
+          let results: Array<{ title: string; url: string; content: string }>;
+          try {
+            results = await webSearch(query);
+          }
+          catch (err) {
+            return `Search unavailable: ${err instanceof Error ? err.message : 'Unknown error'}`;
+          }
+          await runMutation(internal.projects.incrementValidationSearchCount, { threadId });
+          return JSON.stringify(results);
+        },
+      }),
+    };
+  }
+  return {};
+}
+
+// ---------------------------------------------------------------------------
+// sendMessage — router (Haiku) + specialist agent dispatch
+// ---------------------------------------------------------------------------
 
 export const sendMessage = action({
   args: {
@@ -198,21 +347,66 @@ export const sendMessage = action({
     const messageCount = await ctx.runQuery(internal.chat.countMessages, { threadId });
     await ctx.runMutation(internal.chat.insertMessage, { threadId, role: 'user', content });
 
-    const [memData, lastMessages] = await Promise.all([
+    const [memData, lastMessages, projectScores] = await Promise.all([
       ctx.runQuery(internal.chat.getMemoryForThread, { threadId }),
       ctx.runQuery(internal.chat.listMessagesInternal, { threadId }),
+      ctx.runQuery(internal.gamification.getProjectScoresInternal, { threadId }),
     ]);
 
-    const lastMsgCreatedAt = lastMessages.length > 0 ? lastMessages[lastMessages.length - 1].createdAt : null;
-    const fullPrompt = buildFullPrompt(content, memData, lastMsgCreatedAt);
-
-    const { thread } = await chatAgent.continueThread(ctx, { threadId });
-    const { text } = await thread.generateText({
-      prompt: fullPrompt,
-      tools: buildAgentTools(ctx.runMutation.bind(ctx), threadId, memData),
+    // Router (Haiku): route + optionally compress + select relevant memory
+    const routerDecision = await routeMessage({
+      content,
+      userMem: memData.userMem as MemEntry[],
+      projectMem: memData.projectMem as MemEntry[],
+      projectScores: projectScores as { validation?: number; design?: number; development?: number; distribution?: number } | null,
     });
 
-    const responseText = text ?? '';
+    // Build mem data with router-selected memory fragments
+    const selectedKeys = new Set(routerDecision.selectedMemory.map((m: MemEntry) => m.key));
+    const memDataForAgent: MemData = {
+      ...memData,
+      userMem: (memData.userMem as MemEntry[]).filter((u: MemEntry) => selectedKeys.has(u.key)),
+      projectMem: (memData.projectMem as MemEntry[]).filter((p: MemEntry) => selectedKeys.has(p.key)),
+    };
+
+    const lastMsgCreatedAt = lastMessages.length > 0
+      ? (lastMessages[lastMessages.length - 1] as { createdAt: number }).createdAt
+      : null;
+    const fullPrompt = buildFullPrompt(routerDecision.processedMessage, memDataForAgent, lastMsgCreatedAt);
+
+    const selectedAgent = SPECIALIST_AGENTS[routerDecision.specialist as AgentType];
+    const commonTools = buildCommonTools(
+      ctx.runMutation.bind(ctx),
+      ctx.runQuery.bind(ctx),
+      threadId,
+      memData,
+    );
+    const specializedTools = buildSpecializedTools(
+      routerDecision.specialist,
+      ctx.runMutation.bind(ctx),
+      ctx.runQuery.bind(ctx),
+      threadId,
+    );
+
+    const { thread } = await selectedAgent.continueThread(ctx, { threadId });
+    const allTools: any = { ...commonTools, ...specializedTools };
+    const result = await thread.generateText({
+      prompt: fullPrompt,
+      tools: allTools,
+    });
+
+    // AI SDK v6: result.text = finalStep.text only.
+    // If the last step ended with a tool call (e.g. saveProjectMemory after the response),
+    // text is "" even if a prior step generated the actual response.
+    // Fall back to the last step that produced non-empty text.
+    let responseText = result.text ?? '';
+    if (!responseText) {
+      const steps = (result as any).steps as Array<{ text?: string }> | undefined;
+      if (steps && steps.length > 0) {
+        const lastTextStep = [...steps].reverse().find(s => s.text);
+        responseText = lastTextStep?.text ?? '';
+      }
+    }
     await ctx.runMutation(internal.chat.insertMessage, { threadId, role: 'assistant', content: responseText });
 
     if (messageCount === 0) {
@@ -223,7 +417,9 @@ export const sendMessage = action({
   },
 });
 
-// ---- Read queries ----
+// ---------------------------------------------------------------------------
+// Read queries
+// ---------------------------------------------------------------------------
 
 export const listMessages = query({
   args: { threadId: v.string() },
@@ -258,7 +454,9 @@ export const countMessages = internalQuery({
   },
 });
 
-// ---- Thread title ----
+// ---------------------------------------------------------------------------
+// Thread title
+// ---------------------------------------------------------------------------
 
 export const updateThreadTitle = internalMutation({
   args: { threadId: v.string(), title: v.string() },
@@ -289,7 +487,9 @@ export const generateThreadTitle = internalAction({
   },
 });
 
-// ---- Internal queries ----
+// ---------------------------------------------------------------------------
+// Internal queries
+// ---------------------------------------------------------------------------
 
 export const getProjectByThreadId = internalQuery({
   args: { threadId: v.string() },

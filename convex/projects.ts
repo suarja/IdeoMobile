@@ -1,8 +1,8 @@
 import type { Id } from './_generated/dataModel';
 import { v } from 'convex/values';
 import { internal } from './_generated/api';
-import { internalMutation, mutation, query } from './_generated/server';
-import { chatAgent } from './agents/chatAgent';
+import { internalMutation, internalQuery, mutation, query } from './_generated/server';
+import { generalAgent } from './agents/chatAgent';
 
 export const createProjectAndThread = internalMutation({
   args: {},
@@ -13,7 +13,7 @@ export const createProjectAndThread = internalMutation({
     }
     const userId = identity.subject;
 
-    const { threadId } = await chatAgent.createThread(ctx, {});
+    const { threadId } = await generalAgent.createThread(ctx, {});
 
     // Deactivate all existing projects for this user
     const existingProjects = await ctx.db
@@ -141,5 +141,49 @@ export const updateProjectName = internalMutation({
   args: { projectId: v.id('projects'), name: v.string() },
   handler: async (ctx, { projectId, name }) => {
     await ctx.db.patch(projectId, { name });
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Validation search quota (per-project: max 1, monthly: max 4)
+// ---------------------------------------------------------------------------
+
+export const getValidationSearchQuota = internalQuery({
+  args: { threadId: v.string() },
+  handler: async (ctx, { threadId }) => {
+    const project = await ctx.db
+      .query('projects')
+      .withIndex('by_threadId', q => q.eq('threadId', threadId))
+      .first();
+
+    const projectCount = project?.validationSearchCount ?? 0;
+
+    // Monthly count: sum all validationSearchCount across projects for this user in last 30 days
+    // For simplicity, we count the total across all user projects (since we can't filter by date here)
+    // A more precise approach would use a separate searches table — acceptable for POC
+    let monthlyCount = 0;
+    if (project) {
+      const allProjects = await ctx.db
+        .query('projects')
+        .withIndex('by_userId', q => q.eq('userId', project.userId))
+        .collect();
+      monthlyCount = allProjects.reduce((sum, p) => sum + (p.validationSearchCount ?? 0), 0);
+    }
+
+    return { projectCount, monthlyCount };
+  },
+});
+
+export const incrementValidationSearchCount = internalMutation({
+  args: { threadId: v.string() },
+  handler: async (ctx, { threadId }) => {
+    const project = await ctx.db
+      .query('projects')
+      .withIndex('by_threadId', q => q.eq('threadId', threadId))
+      .first();
+    if (!project)
+      return;
+    const current = project.validationSearchCount ?? 0;
+    await ctx.db.patch(project._id, { validationSearchCount: current + 1 });
   },
 });

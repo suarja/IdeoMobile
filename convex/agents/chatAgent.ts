@@ -2,8 +2,8 @@ import { anthropic } from '@ai-sdk/anthropic';
 import { Agent } from '@convex-dev/agent';
 import { components } from '../_generated/api';
 
-export const chatAgent = new Agent(components.agent, {
-  name: 'Chat Agent',
+export const generalAgent = new Agent(components.agent, {
+  name: 'General Agent',
   languageModel: anthropic('claude-sonnet-4-6'),
   instructions: `You are a strategic co-founder advisor for vibe coders — developers building with AI tools who need clarity and momentum.
 
