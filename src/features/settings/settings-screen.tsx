@@ -1,6 +1,9 @@
-import { useAuth } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
 
 import Env from 'env';
+import * as StoreReview from 'expo-store-review';
+import { useState } from 'react';
+import { Linking, Share as RNShare } from 'react-native';
 import {
   colors,
   FocusAwareStatusBar,
@@ -8,51 +11,195 @@ import {
   Text,
   View,
 } from '@/components/ui';
-import { Github, Rate, Share, Support, Website } from '@/components/ui/icons';
+import { Github, Rate, Share as ShareIcon, Support, Website } from '@/components/ui/icons';
+import { useModal } from '@/components/ui/modal';
 import { translate } from '@/lib/i18n';
+import { useAppConfig, useUpsertUserProfile, useUserProfile } from './api';
+import { EditSocialLinksBottomSheet } from './components/edit-social-links-bottom-sheet';
 import { LanguageItem } from './components/language-item';
 import { MemoryItem } from './components/memory-bottom-sheet';
 import { ProjectsItem } from './components/projects-bottom-sheet';
 import { SettingsContainer } from './components/settings-container';
 import { SettingsItem } from './components/settings-item';
+import { SocialLinkRow } from './components/social-link-row';
+import { UserAvatar } from './components/user-avatar';
 import { WhisperModelItem } from './components/whisper-model-item';
+
+type Platform = 'github' | 'instagram' | 'tiktok' | 'website';
+
+function buildSocialHandlers(
+  selectedPlatform: Platform | null,
+  userProfile: ReturnType<typeof useUserProfile>,
+  upsertUserProfile: ReturnType<typeof useUpsertUserProfile>,
+) {
+  const getLinksForPlatform = (platform: Platform) =>
+    userProfile?.socialLinks.filter(l => l.platform === platform) ?? [];
+
+  const handleSocialSave = (newLinks: Array<{ url: string }>) => {
+    if (!selectedPlatform) {
+      return;
+    }
+    const otherLinks
+      = userProfile?.socialLinks.filter(l => l.platform !== selectedPlatform) ?? [];
+    const mergedLinks = [
+      ...otherLinks,
+      ...newLinks.map(l => ({ platform: selectedPlatform, url: l.url })),
+    ];
+    void upsertUserProfile({ socialLinks: mergedLinks });
+  };
+
+  return { getLinksForPlatform, handleSocialSave };
+}
+
+function ProfileHeader() {
+  const { user } = useUser();
+  const displayName
+    = user?.firstName || user?.lastName
+      ? `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim()
+      : (user?.primaryEmailAddress?.emailAddress ?? translate('profile.username'));
+
+  return (
+    <View className="items-center pt-24 pb-8">
+      <View className="mb-3">
+        <UserAvatar
+          imageUrl={user?.imageUrl}
+          firstName={user?.firstName}
+          lastName={user?.lastName}
+          email={user?.primaryEmailAddress?.emailAddress}
+        />
+      </View>
+      <Text className="text-lg font-semibold" style={{ color: colors.brand.dark }}>
+        {displayName}
+      </Text>
+      <View
+        className="mt-1 rounded-full px-3 py-0.5"
+        style={{
+          backgroundColor: colors.brand.selected,
+          borderWidth: 1,
+          borderColor: colors.brand.border,
+        }}
+      >
+        <Text className="text-xs font-medium" style={{ color: colors.brand.dark }}>
+          {translate('profile.free_plan')}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+type SupportSectionProps = {
+  iconColor: string;
+  appConfig: ReturnType<typeof useAppConfig>;
+};
+
+function SupportSection({ iconColor, appConfig }: SupportSectionProps) {
+  return (
+    <SettingsContainer title="settings.support_us">
+      <SettingsItem
+        text="settings.share"
+        icon={<ShareIcon color={iconColor} />}
+        onPress={() => {
+          void RNShare.share({ url: appConfig?.shareUrl ?? '', message: 'Check out Ideo!' });
+        }}
+      />
+      <SettingsItem
+        text="settings.rate"
+        icon={<Rate color={iconColor} />}
+        onPress={() => { void StoreReview.requestReview(); }}
+      />
+      <SettingsItem
+        text="settings.support"
+        icon={<Support color={iconColor} />}
+        onPress={() => { void Linking.openURL(`mailto:${appConfig?.supportEmail ?? ''}`); }}
+      />
+    </SettingsContainer>
+  );
+}
+
+type LinksSectionProps = {
+  iconColor: string;
+  appConfig: ReturnType<typeof useAppConfig>;
+};
+
+function LinksSection({ iconColor, appConfig }: LinksSectionProps) {
+  return (
+    <SettingsContainer title="settings.links">
+      <SettingsItem
+        text="settings.privacy"
+        onPress={() => { void Linking.openURL(appConfig?.privacyUrl ?? ''); }}
+      />
+      <SettingsItem
+        text="settings.terms"
+        onPress={() => { void Linking.openURL(appConfig?.termsUrl ?? ''); }}
+      />
+      <SettingsItem
+        text="settings.github"
+        icon={<Github color={iconColor} />}
+        onPress={() => { void Linking.openURL(appConfig?.githubUrl ?? ''); }}
+      />
+      <SettingsItem
+        text="settings.website"
+        icon={<Website color={iconColor} />}
+        onPress={() => { void Linking.openURL(appConfig?.websiteUrl ?? ''); }}
+      />
+    </SettingsContainer>
+  );
+}
 
 export function SettingsScreen() {
   const { signOut } = useAuth();
+  const appConfig = useAppConfig();
+  const userProfile = useUserProfile();
+  const upsertUserProfile = useUpsertUserProfile();
   const iconColor = colors.brand.muted;
+
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
+  const editModal = useModal();
+
+  const { getLinksForPlatform, handleSocialSave } = buildSocialHandlers(
+    selectedPlatform,
+    userProfile,
+    upsertUserProfile,
+  );
+
+  const openPlatform = (platform: Platform) => {
+    setSelectedPlatform(platform);
+    editModal.present();
+  };
+
   return (
     <>
       <FocusAwareStatusBar style="dark" />
 
       <ScrollView style={{ backgroundColor: colors.brand.bg }}>
         <View className="flex-1 px-4">
-          {/* Profile header */}
-          <View className="items-center pt-16 pb-8">
-            <View
-              className="mb-3 size-20 items-center justify-center rounded-full"
-              style={{ backgroundColor: colors.brand.dark }}
-            >
-              <Text className="text-3xl" style={{ color: colors.brand.bg }}>V</Text>
-            </View>
-            <Text className="text-lg font-semibold" style={{ color: colors.brand.dark }}>
-              {translate('profile.username')}
-            </Text>
-            <View
-              className="mt-1 rounded-full px-3 py-0.5"
-              style={{
-                backgroundColor: colors.brand.selected,
-                borderWidth: 1,
-                borderColor: colors.brand.border,
-              }}
-            >
-              <Text className="text-xs font-medium" style={{ color: colors.brand.dark }}>
-                {translate('profile.free_plan')}
-              </Text>
-            </View>
-          </View>
+          <ProfileHeader />
 
           <SettingsContainer title="settings.generale">
             <LanguageItem />
+          </SettingsContainer>
+
+          <SettingsContainer title="settings.my_profile">
+            <SocialLinkRow
+              platform="github"
+              links={getLinksForPlatform('github')}
+              onPress={() => openPlatform('github')}
+            />
+            <SocialLinkRow
+              platform="instagram"
+              links={getLinksForPlatform('instagram')}
+              onPress={() => openPlatform('instagram')}
+            />
+            <SocialLinkRow
+              platform="tiktok"
+              links={getLinksForPlatform('tiktok')}
+              onPress={() => openPlatform('tiktok')}
+            />
+            <SocialLinkRow
+              platform="website"
+              links={getLinksForPlatform('website')}
+              onPress={() => openPlatform('website')}
+            />
           </SettingsContainer>
 
           <SettingsContainer title="settings.voice_model">
@@ -65,48 +212,12 @@ export function SettingsScreen() {
           </SettingsContainer>
 
           <SettingsContainer title="settings.about">
-            <SettingsItem
-              text="settings.app_name"
-              value={Env.EXPO_PUBLIC_NAME}
-            />
-            <SettingsItem
-              text="settings.version"
-              value={Env.EXPO_PUBLIC_VERSION}
-            />
+            <SettingsItem text="settings.app_name" value={Env.EXPO_PUBLIC_NAME} />
+            <SettingsItem text="settings.version" value={Env.EXPO_PUBLIC_VERSION} />
           </SettingsContainer>
 
-          <SettingsContainer title="settings.support_us">
-            <SettingsItem
-              text="settings.share"
-              icon={<Share color={iconColor} />}
-              onPress={() => {}}
-            />
-            <SettingsItem
-              text="settings.rate"
-              icon={<Rate color={iconColor} />}
-              onPress={() => {}}
-            />
-            <SettingsItem
-              text="settings.support"
-              icon={<Support color={iconColor} />}
-              onPress={() => {}}
-            />
-          </SettingsContainer>
-
-          <SettingsContainer title="settings.links">
-            <SettingsItem text="settings.privacy" onPress={() => {}} />
-            <SettingsItem text="settings.terms" onPress={() => {}} />
-            <SettingsItem
-              text="settings.github"
-              icon={<Github color={iconColor} />}
-              onPress={() => {}}
-            />
-            <SettingsItem
-              text="settings.website"
-              icon={<Website color={iconColor} />}
-              onPress={() => {}}
-            />
-          </SettingsContainer>
+          <SupportSection iconColor={iconColor} appConfig={appConfig} />
+          <LinksSection iconColor={iconColor} appConfig={appConfig} />
 
           <View className="my-8">
             <SettingsContainer>
@@ -115,6 +226,13 @@ export function SettingsScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <EditSocialLinksBottomSheet
+        ref={editModal.ref}
+        platform={selectedPlatform}
+        links={selectedPlatform ? getLinksForPlatform(selectedPlatform) : []}
+        onSave={handleSocialSave}
+      />
     </>
   );
 }

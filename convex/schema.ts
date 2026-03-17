@@ -118,4 +118,34 @@ export default defineSchema({
   })
     .index('by_projectId', ['projectId'])
     .index('by_projectId_key', ['projectId', 'key']),
+
+  // --- App Config ---
+
+  appConfig: defineTable({
+    supportEmail: v.string(),
+    appStoreUrl: v.string(),
+    shareUrl: v.string(),
+    privacyUrl: v.string(),
+    termsUrl: v.string(),
+    websiteUrl: v.string(),
+    githubUrl: v.string(),
+  }),
+
+  // --- User Profiles ---
+
+  userProfiles: defineTable({
+    userId: v.string(),
+    socialLinks: v.array(
+      v.object({
+        platform: v.union(
+          v.literal('github'),
+          v.literal('instagram'),
+          v.literal('tiktok'),
+          v.literal('website'),
+        ),
+        url: v.string(),
+      }),
+    ),
+    updatedAt: v.number(),
+  }).index('by_userId', ['userId']),
 });
