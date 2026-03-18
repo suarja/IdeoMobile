@@ -1,8 +1,8 @@
 # Multi-Agent Architecture
 
-**Implémenté :** 2026-03-17
+**Implémenté :** 2026-03-17 — Streaming : 2026-03-18
 **Branch :** `feat/focus-screen`
-**Statut :** Backend complet — router Haiku + 4 agents spécialisés + outils gamification + web search
+**Statut :** Backend complet — router Haiku + 4 agents spécialisés + outils gamification + web search + streaming temps réel
 
 ---
 
@@ -22,7 +22,14 @@ routerAgent (Haiku — internalAction, sans continueThread)
     ↓
 selectedAgent.continueThread(ctx, { threadId })   ← même threadId partagé
     ↓
-thread.generateText({ prompt, tools: commonTools + specializedTools })
+thread.streamText(                                 ← remplace generateText
+  { prompt, tools: commonTools + specializedTools },
+  { saveStreamDeltas: true }                       ← écrit les deltas en DB temps réel
+)
+    ↓
+await result.text                                  ← consomme le stream jusqu'à la fin
+    ↓
+insertMessage(threadId, 'assistant', responseText) ← table messages legacy
 ```
 
 ---
@@ -105,6 +112,151 @@ La recherche n'est **pas déclenchée automatiquement**. L'agent doit :
 L'outil vérifie le quota avant d'exécuter :
 - **Max 1 recherche par projet** (`validationSearchCount` dans la table `projects`)
 - **Max 4 recherches par mois** (somme sur tous les projets de l'utilisateur)
+
+---
+
+## Streaming temps réel
+
+### Architecture
+
+Le streaming repose sur deux tables internes de `@convex-dev/agent` : les messages paginés et les deltas en cours. Le client fusionne les deux via `useUIMessages`.
+
+```
+[Convex action: thread.streamText + saveStreamDeltas: true]
+    ↓ écrit des deltas progressifs dans les tables internes @convex-dev/agent
+    ↓
+[Query Convex: listThreadMessages]           ← listUIMessages + syncStreams + vStreamArgs
+    ↓ fusionne messages paginés + deltas streaming
+    ↓
+[Hook client: useAgentThreadMessages]        ← useUIMessages(api.chat.listThreadMessages, { threadId }, { stream: true })
+    ↓ résultats en temps réel : results[].status === 'streaming' pendant la génération
+    ↓
+[useIdeaSession]
+    isSynthesizing = isSending || results.some(m.status === 'streaming')
+    streamingText  = lastMsg avec status === 'streaming' → .text
+    clarification  = parsé depuis rawAssistantText (marker %%CLARIFY%%
+```
+
+### Deux tables de messages — ne pas confondre
+
+| Table | Accès | Usage |
+|---|---|---|
+| `messages` (Convex custom) | `api.chat.listMessages` → `useMessages` | Historique legacy, affiché dans Settings > Memory |
+| Tables internes `@convex-dev/agent` | `api.chat.listThreadMessages` → `useAgentThreadMessages` | Streaming temps réel, UIMessages avec statuts |
+
+Les deux coexistent : `sendMessage` insère dans les deux (agent stocke automatiquement, `insertMessage` pour le custom). Pour le streaming, **toujours utiliser `listThreadMessages`**.
+
+### Query `listThreadMessages`
+
+```typescript
+// convex/chat.ts
+export const listThreadMessages = query({
+  args: {
+    threadId: v.string(),
+    paginationOpts: paginationOptsValidator,
+    streamArgs: vStreamArgs,           // ← requis pour le streaming
+  },
+  handler: async (ctx, args) => {
+    const paginated = await listUIMessages(ctx, components.agent, args);
+    const streams = await syncStreams(ctx, components.agent, args);
+    return { ...paginated, streams };  // ← streams obligatoire pour useUIMessages
+  },
+});
+```
+
+Imports depuis `@convex-dev/agent` (package principal, pas `/react`) : `listUIMessages`, `syncStreams`, `vStreamArgs`.
+
+### Hook client
+
+```typescript
+// src/features/idea/api.ts
+export function useAgentThreadMessages(threadId: string | null) {
+  return useUIMessages(
+    api.chat.listThreadMessages,
+    threadId ? { threadId } : 'skip',
+    { initialNumItems: 30, stream: true },
+  );
+}
+```
+
+`useUIMessages` vient de `@convex-dev/agent/react`. Retourne `{ results, status, loadMore }` — chaque `result` est un `UIMessage` avec `status: 'streaming' | 'success' | 'failed'` et `text: string`.
+
+---
+
+## Clarification interactive — pattern %%CLARIFY%%
+
+### Pourquoi pas un tool
+
+La première implémentation utilisait `setClarification` comme tool AI SDK. Cela a provoqué une erreur critique :
+
+```
+messages.0.content.0: unexpected tool_use_id found in tool_result blocks
+```
+
+**Cause** : les tools créent des paires `tool_use`/`tool_result` dans l'historique du thread. Lors du step suivant (ou du prochain `continueThread`), si la reconstruction de contexte inclut le `tool_result` sans son `tool_use` précédent (à cause du windowing `recentMessages: 10`), Anthropic rejette la requête.
+
+**Décision** : ne jamais utiliser de tool pour une interaction purement client-side. Utiliser un marker textuel à la place.
+
+> **Règle** : tout tool avec `execute: async () => JSON.stringify(args)` (sans side-effect réel en DB) est un candidat au problème. Préférer un marker texte.
+
+### Format
+
+Les agents écrivent le marker à la **toute fin** de leur réponse textuelle :
+
+```
+%%CLARIFY:{"type":"single_choice","question":"...","options":["A","B"]}%%
+```
+
+Types supportés :
+- `single_choice` + `options: string[]`
+- `multi_select` + `options: string[]`
+- `confirm_cancel` + `confirmLabel: string` + `cancelLabel: string`
+
+### Instructions agents (tous les 5)
+
+Chaque agent a cette règle dans ses `instructions` :
+
+```
+CLARIFICATION RULE:
+When you genuinely need user input to proceed, append a JSON block at the VERY END of your
+response. Use this format at most ONCE per response:
+%%CLARIFY:{"type":"single_choice","question":"...","options":["Option A","Option B"]}%%
+Always write a brief explanation in your text BEFORE the %%CLARIFY block.
+```
+
+### Parsing côté client
+
+```typescript
+// use-idea-session.ts
+const CLARIFY_REGEX = /%%CLARIFY:(\{.*?\})%%/s;
+
+function parseClarificationFromText(text: string): Clarification | null {
+  const match = CLARIFY_REGEX.exec(text);
+  if (!match) return null;
+  try { return JSON.parse(match[1]) as Clarification; }
+  catch { return null; }
+}
+
+export function stripClarifyMarker(text: string): string {
+  return text.replace(CLARIFY_REGEX, '').trimEnd();
+}
+```
+
+Le texte affiché à l'utilisateur est toujours `stripClarifyMarker(rawText)` — le marker n'est jamais visible.
+
+### Flow clarification
+
+```
+Agent génère texte + %%CLARIFY:{...}%%
+    ↓ stream termine, message committed
+    ↓
+useIdeaSession.clarification = parsé depuis rawAssistantText
+    ↓
+IdeaScreen affiche QuestionSingleChoice / QuestionMultiSelect / QuestionConfirmCancel
+    ↓ user tape une option
+handleClarificationSelect(option) → handleSend(option)
+    ↓ nouveau message user avec la sélection → nouveau cycle synthesizing
+```
 
 ---
 
