@@ -49,19 +49,24 @@ export function SessionContinuationChips({ onContinue, onNewTopic }: Props) {
         </TouchableOpacity>
       </View>
 
-      <Modal ref={ref} snapPoints={['45%']} title="Choisir un sujet">
+      <Modal ref={ref} snapPoints={['45%']} backgroundStyle={{ backgroundColor: colors.brand.bg }}>
         <View style={styles.sheetContent}>
-          {TOPIC_OPTIONS.map(({ label, emoji, hint }) => (
-            <TouchableOpacity
-              key={hint}
-              onPress={() => handleTopicSelect(hint)}
-              style={styles.sheetRow}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.sheetEmoji}>{emoji}</Text>
-              <Text style={styles.sheetLabel}>{label}</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.brand.muted} />
-            </TouchableOpacity>
+          <Text style={styles.sheetTitle}>Choisir un sujet</Text>
+          {TOPIC_OPTIONS.map(({ label, emoji, hint }, index) => (
+            <View key={hint}>
+              <TouchableOpacity
+                onPress={() => handleTopicSelect(hint)}
+                style={styles.sheetRow}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.sheetEmoji}>{emoji}</Text>
+                <Text style={styles.sheetLabel}>{label}</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.brand.muted} />
+              </TouchableOpacity>
+              {index < TOPIC_OPTIONS.length - 1 && (
+                <View style={styles.separator} />
+              )}
+            </View>
           ))}
         </View>
       </Modal>
@@ -113,19 +118,28 @@ const styles = StyleSheet.create({
   sheetContent: {
     paddingBottom: 24,
     paddingHorizontal: 24,
-    paddingTop: 8,
+    paddingTop: 0,
+  },
+  sheetTitle: {
+    color: colors.brand.dark,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 12,
+    textAlign: 'center',
   },
   sheetRow: {
     alignItems: 'center',
-    borderBottomColor: colors.brand.border,
-    borderBottomWidth: 1,
     flexDirection: 'row',
-    gap: 12,
-    paddingVertical: 14,
+    gap: 8,
+    paddingVertical: 12,
+  },
+  separator: {
+    backgroundColor: colors.brand.border,
+    height: 1,
   },
   sheetEmoji: {
     fontSize: 18,
-    width: 28,
+    width: 22,
   },
   sheetLabel: {
     color: colors.brand.dark,

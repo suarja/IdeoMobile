@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
-    gap: 2,
+    gap: 0,
   },
   label: {
     fontSize: 10,

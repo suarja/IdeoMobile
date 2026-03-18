@@ -25,6 +25,63 @@ import { useVoiceRecording } from './use-voice-recording';
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const THREE_HOURS_MS = 3 * ONE_HOUR_MS;
 
+type Segment = { text: string; bold: boolean; italic: boolean };
+
+/**
+ * Parses ***bold italic***, **bold**, *italic* and _italic_ into segments.
+ * Falls back to plain text for anything not matched.
+ */
+function parseMarkdownInline(raw: string): Segment[] {
+  const segments: Segment[] = [];
+  // Matches: ***…***, **…**, *…*, _…_
+  const RE = /\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|_(.+?)_/gs;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = RE.exec(raw)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ text: raw.slice(lastIndex, match.index), bold: false, italic: false });
+    }
+    if (match[1] !== undefined) {
+      segments.push({ text: match[1], bold: true, italic: true });
+    }
+    else if (match[2] !== undefined) {
+      segments.push({ text: match[2], bold: true, italic: false });
+    }
+    else if (match[3] !== undefined || match[4] !== undefined) {
+      segments.push({ text: (match[3] ?? match[4])!, bold: false, italic: true });
+    }
+    lastIndex = RE.lastIndex;
+  }
+  if (lastIndex < raw.length) {
+    segments.push({ text: raw.slice(lastIndex), bold: false, italic: false });
+  }
+  return segments.length > 0 ? segments : [{ text: raw, bold: false, italic: false }];
+}
+
+function AgentText({ text, baseStyle }: { text: string; baseStyle: object }) {
+  const segments = parseMarkdownInline(text);
+  if (segments.length === 1 && !segments[0].bold && !segments[0].italic) {
+    return <Text style={baseStyle}>{text}</Text>;
+  }
+  return (
+    <Text>
+      {segments.map((seg, i) => (
+        <Text
+          key={i}
+          style={[
+            baseStyle,
+            seg.bold && { fontWeight: '700' as const },
+            seg.italic && { fontStyle: 'italic' as const },
+          ]}
+        >
+          {seg.text}
+        </Text>
+      ))}
+    </Text>
+  );
+}
+
 function InlineSynthesizing() {
   const rotation = useRef(new Animated.Value(0)).current;
 
@@ -221,12 +278,10 @@ export function IdeaScreen() {
         {(displayText || session.isSynthesizing) && (
           <View style={styles.agentMessage}>
             {!session.isSynthesizing && <Text style={styles.cardLabel}>Advisor</Text>}
-            <Text style={styles.agentText}>
-              {displayText}
-              {session.isSynthesizing && session.streamingText
-                ? <Text style={styles.cursor}>▌</Text>
-                : null}
-            </Text>
+            <AgentText
+              text={displayText + (session.isSynthesizing && session.streamingText ? '▌' : '')}
+              baseStyle={styles.agentText}
+            />
           </View>
         )}
 
@@ -431,7 +486,7 @@ const styles = StyleSheet.create({
   agentText: {
     color: colors.brand.dark,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '400',
     lineHeight: 20,
   },
   cursor: {
