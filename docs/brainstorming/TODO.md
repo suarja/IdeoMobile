@@ -1,9 +1,33 @@
+## Bugs
+
+### UI
+- La bottom sheet modal qui concerne les chips, je sais pas comment ils s'appellent, dans la page centrale, le composant destiné à savoir si l'utilisateur veut continuer ou choisir un autre sujet lorsqu'ils cliquent sur un autre sujet.
+
+Le bottom sheet modal sourd le bottom sheet modal. Le contenu est aligné en bas, donc faudrait la ligne en rose. Je pense que la bottom sheet modal n'est pas la même couleur, n'a pas les bonnes couleurs, ni le bon design et les pas les bons divider. Tout ça est riche. 
+
+- Dans le composant, donc les gens forment component. Il faudrait pouvoir avoir un bouton pour valider le choix, parce que là actuellement des comptes cliquent sur l'une des options. Il n'y a pas de possibilité de changer d'avis et ensuite de valider, par exemple. Il faudrait ajouter un bouton valider et que le bouton, donc la check box, passe soit sélectionnée. Qu'on passe le composant d'état à l'état sélectionné. 
+
+- Lors du streaming de la réponse de l'agent, il y a un scroll to the bottom jusqu'à la fin du message, où le scroll to bottom s'arrête. Potentiellement, si le message est très long, on ne voit pas la fin du message, puisqu'on n'est pas scrolled to the bottom. On est resté à un moment, comment dire? La fin du message arrive et du coup on perd le scroll to bottom. Voilà, donc il faudrait à la fin du message scroll to the bottom. 
+
+- Lorsque l'agent renvoie un message de clarification dans le streaming, avant que ce soit rendérisé en Agent Form Component, on voit le format utilisé par l'agent. 
+
+- Il faudrait aussi rendre le markdown. En fait, l'agent répond au markdown, et il y a notamment, par exemple, les messages qui sont bold. Il faudrait soit escaper le markdown, moi je pense que soit on dit à l'agent de ne pas répondre au markdown, parce qu'en plus nous on utilise déjà une police qui est bold, donc je sais pas comment on pourrait faire.
+
+Vaut mieux escaper les bold, le texte en gras. Ou alors on essaye de rendre le texte en gras d'une autre façon, grâce. Faut duuuu, comment on peut faire? 
+
+- Concernant la barre de navigation, il y a trop d'espace entre l'icône et le texte. Il faudrait rapprocher le texte et l'icône. 
+
+
+
+### Code
+- Lorsque on télécharge un modèle de transcription, il y a une erreur levée par React, indiquant potentiellement une boucle infinie, mais qui ne bloque pas, ou en tout cas ne bloque pas de façon significative. C'est juste une alerte, peut-être pendant une phase du téléchargement du modèle.
+
+Le flot du modèle est aussi à vérifier, dans le sens où on prévient pas l'utilisateur que on demande pas à l'utilisateur de télécharger le modèle, et on prévient pas non plus au démarrage, la première fois. 
+
 
 ## Gamification
 ## tool to update radar ponderation and project score
-### Handle voice session logic (standup)
-- quand est ce qu'une session est crééé
-- Voir un détecteur, une espèce de modal ou autre, qui crée une animation et qui participe à la création de nouvelles sessions de voix, lorsque l'utilisateur revient sur l'application ou que une session se termine avec un élément, une animation, quelque chose de visuel, donc un agent. Merci. 
+
 
 ### Create a personnalized challenges based on users 
 
@@ -16,33 +40,55 @@ Shared SYSTEM_CHALLENGE_POOL, pickRandom, and
 - Il faudrait blocker la demande de complétion des challenges une fois toutes les heures 
 - change the way the agent formulates its response to adress to the user directly and have the user context?
 
+- Il faudrait ajouter un module comme sur GitHub pour la daily streak, plutôt que de l'avoir dans la progress bar. À voir le petit indicateur pour le habit tracker. Je peux, comment ça s'appelle exactement, là où on voit les petits carrés verts, la petite pour l'activité sur la plateforme? 
+
 
 
 ### Chat Agent
-- [x] check user daily challenges (readDailyChallenges tool)
-- [x] multi-agent router (Haiku router + 4 specialist agents)
-- [x] web search (Tavily/Perplexity/Anthropic native — triggerValidationSearch)
-- session detector
-Il faudrait que, quand l'application le sourd, on fasse un check rapide, par exemple, "a eu lieu le dernier message?" et que, du coup, on puisse, pas raison, dans un premier temps, peut-être, prompter l'utilisateur pour lui demander ce qu'il veut : continuer la session précédente ou en démarrer une autre.
 
-Non, c'est un peu con, parce que, toute façon, c'est la même conversation en fait. Si, si, mais ça va être un peu de la magie en fait dans l'interface, en sache que je veux dire.
+- Il faudrait implémenter le paramètre d'ajustement de l'heure du rituel du Daily Stand-Up. 
 
-C'est que, si on veut recommencer une nouvelle session, on ne va pas afficher son dernier message ni celui de l'agent. On va avoir un canvas blanc. S'il continue, bon, laisse tel quel. Non, c'est pas moi. 
 
 #### Chat interface
-- tool calling show in interface
-Il faudrait intégrer maintenant qu'on va avoir le tool calling. Il faudrait créer l'interface pour cela. 
 
-- agent form components 
+- Ajouter guard agent (router)
 
-- au dela d'une certaine longeur de message que faire? 
-  - apple intélligence ?
-  - modèle pour compacter et résumer 
-  - 
 
-- 
 
-##
+### Handle voice session logic (standup)
+
+
+##### Flow rituel vs Commit
+
+Et du coup nous on gère la non-gérant, comment dire, côté front-end. On va gérer cette attribution de points, tout ça pour vraiment donner l'illusion de la gamification de l'engagement.  
+  
+Et en fait l'agence qui va faire, c'est qu'il faut que vraiment ils déduisent à chaque fois si c'est une nouvelle session. En fait une nouvelle session, ça peut être à chaque fois que l'utilisateur revient sur l'app. Si par exemple il change de sujet, on voit à chaque fois ce qu'il faut qu'il fasse. C'est qu'il est à l'esprit que il faut qu'il construise son interaction avec l'utilisateur comme si c'était une session.  
+  
+Par exemple est-ce que c'est comme si on allait du daily stand-up ou alors que moi par exemple je vais voir mon tech lead et je lui demande pour une question? Tu vois, c'est des petites sessions. Ça peut être juste une session question rapide, une session plus se formaliser et rituel dans le daily stand-up ou alors une réunion de fansprint.  
+  
+Il faut qu'il s'adapte à chaque fois qui le déduisent et qu'il essaye d'orienter comme ça. Il y a ces deux bleus mécanique et agent, qui un peu plus invisible mais qui va permettre en fait que l'agence soit un peu plus responsable, soit plus qui s'adapte et qui soit plus pertinent à chaque fois au besoin de l'utilisateur pour la session, le type de session, section actuelle, sans parler de sessions ni rien.  
+  
+C'est juste qu'il faut qu'il laisse cette trame en tête et qu'il surtout ils répondent et organisent disons l'interaction comme ça.  
+  
+Et en fait le côté mobile, côté front-end, qui va récompenser l'utilisateur à chaque interaction et donner cette base de si, à chaque fois que je viens sur l'app, je suis récompensé donc j'ai plus intérêt à venir sur l'app pour par exemple demander de l'aide, faire mes daily stand-up.  
+  
+Et peut-être, quand l'utilisateur vient sur l'application, pour par exemple il est à partir de 6:00 du matin, on va dire. On dit la première fois, on va voir peut-être une animation de daily stand-up, tu vois, ou alors quelque chose. Ça pourrait être paramétrable, d'ailleurs. C'est quelque chose qu'on pourrait très bien demander pendant le onboarding pour que l'application réagisse.  
+  
+Voilà, très bien, donc on pourra paramétrer le daily stand-up, par exemple tous les jours le matin à 6:00 sur bref.  
+  
+Et en fait les fois où les utilisateurs se connectent, après une fois que le daily stand-up a été fait, c'est plutôt des interactions plus pour demander de l'aide. Là on va juste récompenser pour avoir ouvert l'app et sans grosse animation de rituels, tu vois.  
+  
+Voilà, comme ça on pourrait différencier les animations rituelles, les animations d'engagement, tu vois, donc les hiérarchiser. Les animations rituelles sont beaucoup plus conséquentes, intrusives, on va dire un peu plus ritualisé, et les animations d'engagement elles sont plus légères. Elles permettent juste de récompenser l'utilisateur pour son engagement.  
+  
+C'est pas mal cette idée.  
+  
+Et bien sûr les animations rituelles, elles sont programmables. Faudrait voir dans quelles mesures aussi on peut détecter à chaque fois que l'utilisateur se connecte. On peut peut-être lui afficher un conseil, les engagements par exemple, si l'utilisateur s'est connecté il y a une heure.  
+  
+On lui demande à chaque fois : "Est-ce que tu veux continuer ou pas?" Tu vois, mais c'est quelque chose de très discret, c'est pas intrusif. C'est par exemple en bas de l'écran, juste en bas du dernier message de l'advisor, on a un choix, un petit message texte qui dit : "C'est fait longtemps. Vous voulez continuer ou recommencer? Pas des zéros mais."  
+  
+Et là on lui propose par exemple une option : "Besoin d'aide, d'aide technique, d'un conseil, distribution." Tu as quelques options comme ça, par rapport à chaque agent, ce qui nous permettrait ensuite, derrière, de les pré-sélectionner, assez, vraiment smart, ça.
+
+
 
 ### Tools 
 

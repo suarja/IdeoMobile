@@ -122,6 +122,7 @@ Les décisions techniques importantes sont documentées dans `docs/architecture/
 |---------|---------|--------|
 | [`docs/architecture/auth.md`](docs/architecture/auth.md) | Clerk + Convex + SecureStore | Stack auth, flux SSO, persistence session, règles d'identité Convex |
 | [`docs/architecture/gamification.md`](docs/architecture/gamification.md) | Gamification + Focus Screen | 6 tables Convex (levels/userStats/projectScores/voiceSessions/dailyChallenges/goals), scoring, streak, cron défis, outils agent, Focus Screen wiring |
+| [`docs/architecture/agents.md`](docs/architecture/agents.md) | Multi-Agent + Streaming | Router Haiku + 5 spécialistes, `thread.streamText` + `saveStreamDeltas`, `listThreadMessages`, pattern `%%CLARIFY%%` pour la clarification |
 
 ## Bugs Documentés
 
@@ -131,6 +132,7 @@ Des incidents résolus sont consignés dans `docs/bugs/` pour éviter les régre
 |---------|---------|--------|
 | [`docs/bugs/whisper-realtime-capturing-bug.md`](docs/bugs/whisper-realtime-capturing-bug.md) | `use-voice-recording.ts` / Whisper STT | Ne jamais utiliser `Promise.race()` avec timeout pour stopper Whisper — laisse le contexte en état zombie qui bloque toute nouvelle capture |
 | [`docs/bugs/clerk-navigator-online-bug.md`](docs/bugs/clerk-navigator-online-bug.md) | `src/app/_layout.tsx` / Clerk + Convex | `navigator.onLine` est `undefined` en React Native → Clerk croit être offline → `ClerkOfflineError` → `clearAuth()` → données disparaissent ~15s après login. Fix : polyfill en tête de `_layout.tsx`. Ne jamais supprimer la stability wrapper `useAuth()` ni le pattern `'skip'` sur les queries Convex. |
+| [`docs/bugs/convex-agent-tool-use-id-bug.md`](docs/bugs/convex-agent-tool-use-id-bug.md) | `@convex-dev/agent` / multi-step tool calling | Ne jamais créer un tool dont `execute` retourne juste `JSON.stringify(args)` — crée des paires `tool_use`/`tool_result` orphelines dans le contexte → Anthropic rejette. Utiliser un marker texte `%%CLARIFY%%` à la place. |
 
 ## Template Docs
 
