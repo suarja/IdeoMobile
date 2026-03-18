@@ -2,20 +2,54 @@ import { useConvexAuth } from 'convex/react';
 
 import { useEffect, useState } from 'react';
 
-import { useActiveProject, useGetOrCreateThread, useMessages, useSendMessage } from './api';
+import { useActiveProject, useAgentThreadMessages, useGetOrCreateThread, useSendMessage } from './api';
+
+export type ClarificationType = 'single_choice' | 'multi_select' | 'confirm_cancel';
+
+export type Clarification = {
+  question: string;
+  type: ClarificationType;
+  options?: string[];
+  confirmLabel?: string;
+  cancelLabel?: string;
+};
 
 type Message = { role: string; content: string };
 
 type IdeaSession = {
   isSending: boolean;
   isPreview: boolean;
+  isSynthesizing: boolean;
   agentError: string | null;
   lastUserMessage: Message | null;
   lastAssistantMessage: Message | null;
+  streamingText: string;
+  clarification: Clarification | null;
   handleSend: (content: string) => Promise<void>;
   handleCancel: () => void;
   enterPreview: () => void;
+  handleClarificationSelect: (option: string) => void;
 };
+
+const CLARIFY_REGEX = /%%CLARIFY:(\{.*?\})%%/s;
+
+/** Parse the %%CLARIFY:{...}%% marker from agent text. Returns null if absent or invalid. */
+function parseClarificationFromText(text: string): Clarification | null {
+  const match = CLARIFY_REGEX.exec(text);
+  if (!match)
+    return null;
+  try {
+    return JSON.parse(match[1]) as Clarification;
+  }
+  catch {
+    return null;
+  }
+}
+
+/** Strip the %%CLARIFY:{...}%% marker from text for display. */
+export function stripClarifyMarker(text: string): string {
+  return text.replace(CLARIFY_REGEX, '').trimEnd();
+}
 
 export function useIdeaSession(): IdeaSession {
   const [isSending, setIsSending] = useState(false);
@@ -27,27 +61,52 @@ export function useIdeaSession(): IdeaSession {
   const sendMessage = useSendMessage();
 
   // Reactive subscription: updates automatically when the active project changes
-  // (e.g. after setActiveProject is called from the Projects sheet)
   const activeProject = useActiveProject();
   const threadId = activeProject?.threadId ?? null;
 
-  const messages = useMessages(threadId);
+  const agentMessages = useAgentThreadMessages(threadId);
 
-  // Ensure a project exists on mount. Result is ignored — threadId comes
-  // reactively from useActiveProject above, not from this call's return value.
+  // Ensure a project exists on mount.
   useEffect(() => {
     if (!isAuthenticated)
       return;
     getOrCreateThread({}).catch(console.error);
   }, [isAuthenticated, getOrCreateThread]);
 
-  const lastUserMessage = messages
-    ? [...messages].reverse().find(m => m.role === 'user') ?? null
+  const results = agentMessages.results ?? [];
+
+  // Last streaming message (assistant, currently streaming)
+  const streamingMsg = [...results].reverse().find(
+    m => m.role === 'assistant' && m.status === 'streaming',
+  );
+  const rawStreamingText = streamingMsg?.text ?? '';
+  const streamingText = stripClarifyMarker(rawStreamingText);
+
+  // Is synthesizing = we just sent OR there's an active streaming message
+  const hasStreamingMsg = results.some(m => m.role === 'assistant' && m.status === 'streaming');
+  const isSynthesizing = isSending || hasStreamingMsg;
+
+  // Last completed assistant message text (stripped of clarify marker for display)
+  const lastCompletedAssistant = [...results]
+    .reverse()
+    .find(m => m.role === 'assistant' && m.status !== 'streaming');
+  const rawAssistantText = lastCompletedAssistant?.text ?? '';
+  const lastAssistantText = stripClarifyMarker(rawAssistantText);
+
+  // Adapt agent messages to legacy Message shape for compatibility
+  const lastUserMessage: Message | null = (() => {
+    const msg = [...results].reverse().find(m => m.role === 'user');
+    if (!msg)
+      return null;
+    return { role: 'user', content: msg.text ?? '' };
+  })();
+
+  const lastAssistantMessage: Message | null = lastAssistantText
+    ? { role: 'assistant', content: lastAssistantText }
     : null;
 
-  const lastAssistantMessage = messages
-    ? [...messages].reverse().find(m => m.role === 'assistant') ?? null
-    : null;
+  // Clarification parsed from %%CLARIFY:{...}%% marker in last completed assistant message
+  const clarification = rawAssistantText ? parseClarificationFromText(rawAssistantText) : null;
 
   const enterPreview = () => setIsPreview(true);
 
@@ -56,11 +115,6 @@ export function useIdeaSession(): IdeaSession {
     setAgentError(null);
   };
 
-  /**
-   * Sends transcript content to the Convex agent.
-   * State is cleared before the await so the UI resets immediately
-   * rather than waiting for the network round-trip to complete.
-   */
   const handleSend = async (content: string) => {
     if (!threadId || !content.trim())
       return;
@@ -79,14 +133,22 @@ export function useIdeaSession(): IdeaSession {
     }
   };
 
+  const handleClarificationSelect = (option: string) => {
+    handleSend(option).catch(console.error);
+  };
+
   return {
     isSending,
     isPreview,
+    isSynthesizing,
     agentError,
     lastUserMessage,
     lastAssistantMessage,
+    streamingText,
+    clarification,
     handleSend,
     handleCancel,
     enterPreview,
+    handleClarificationSelect,
   };
 }

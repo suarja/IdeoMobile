@@ -67,5 +67,10 @@
     "voice_model": "نموذج الصوت",
     "website": "موقع الكتروني"
   },
+  "synthesizing": {
+    "clarification_label": "توضيح",
+    "loading_step": "جارٍ التحليل…",
+    "title": "جارٍ تحليل أفكارك…"
+  },
   "welcome": "test arabic"
 }

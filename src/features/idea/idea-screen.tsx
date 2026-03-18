@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, FocusAwareStatusBar, Text, View } from '@/components/ui';
@@ -10,6 +10,9 @@ import { translate } from '@/lib/i18n';
 
 import { useActiveThread } from './api';
 import { MicBottomBar } from './components/mic-bottom-bar';
+import { QuestionConfirmCancel } from './components/question-confirm-cancel';
+import { QuestionMultiSelect } from './components/question-multi-select';
+import { QuestionSingleChoice } from './components/question-single-choice';
 import { TranscriptBox } from './components/transcript-box';
 import { useIdeaSession } from './use-idea-session';
 import { useVoiceRecording } from './use-voice-recording';
@@ -17,7 +20,7 @@ import { useVoiceRecording } from './use-voice-recording';
 function getStatusText(flags: {
   isDownloading: boolean;
   isInitializingModel: boolean;
-  isSending: boolean;
+  isSynthesizing: boolean;
   isListening: boolean;
   getDownloadProgress: (id: string) => number;
   currentModelId: string | null;
@@ -28,11 +31,34 @@ function getStatusText(flags: {
   }
   if (flags.isInitializingModel)
     return 'Initializing model…';
-  if (flags.isSending)
-    return 'Thinking…';
+  if (flags.isSynthesizing)
+    return translate('synthesizing.loading_step');
   if (flags.isListening)
     return 'Listening…';
   return translate('idea.subtitle');
+}
+
+function SpinnerIcon() {
+  const rotation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(rotation, {
+        toValue: 1,
+        duration: 900,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [rotation]);
+
+  const rotate = rotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+
+  return (
+    <Animated.View style={[styles.spinner, { transform: [{ rotate }] }]} />
+  );
 }
 
 // eslint-disable-next-line max-lines-per-function
@@ -55,12 +81,12 @@ export function IdeaScreen() {
   const insets = useSafeAreaInsets();
   const isBusy = isInitializingModel || isDownloading;
   const showTranscript = recording.isListening || recording.isStopping || session.isPreview;
-  const showEmpty = !session.lastUserMessage && !session.lastAssistantMessage && !isBusy;
+  const showEmpty = !session.lastUserMessage && !session.lastAssistantMessage && !isBusy && !session.isSynthesizing;
 
   const statusText = getStatusText({
     isDownloading,
     isInitializingModel,
-    isSending: session.isSending,
+    isSynthesizing: session.isSynthesizing,
     isListening: recording.isListening,
     getDownloadProgress,
     currentModelId,
@@ -76,21 +102,36 @@ export function IdeaScreen() {
     recording.clearTranscript();
   };
 
+  // Text to display: prefer streaming text while synthesizing, fall back to completed assistant message
+  const displayText = session.isSynthesizing
+    ? session.streamingText
+    : (session.lastAssistantMessage?.content ?? '');
+
   return (
     <View className="flex-1" style={{ backgroundColor: colors.brand.bg }}>
       <FocusAwareStatusBar />
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={styles.headerTitle}>Ideo</Text>
-        <Ionicons name="share-outline" size={22} color={colors.brand.dark} style={{ opacity: 0.4 }} />
+        {session.isSynthesizing
+          ? (
+              <Text style={styles.synthesizingTitle}>{translate('synthesizing.title')}</Text>
+            )
+          : (
+              <Text style={styles.headerTitle}>Ideo</Text>
+            )}
+        {session.isSynthesizing
+          ? <SpinnerIcon />
+          : <Ionicons name="share-outline" size={22} color={colors.brand.dark} style={{ opacity: 0.4 }} />}
       </View>
 
-      {/* Scrollable content — title, user message, error */}
+      {/* Scrollable content */}
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.ideaTitle}>
-          {activeThread?.title ?? translate('idea.title_placeholder')}
-        </Text>
+        {!session.isSynthesizing && (
+          <Text style={styles.ideaTitle}>
+            {activeThread?.title ?? translate('idea.title_placeholder')}
+          </Text>
+        )}
 
         {showEmpty && (
           <View style={styles.emptyState}>
@@ -100,7 +141,7 @@ export function IdeaScreen() {
           </View>
         )}
 
-        {session.lastUserMessage && (
+        {session.lastUserMessage && !session.isSynthesizing && (
           <View style={styles.userMessage}>
             <Text style={styles.userMessageLabel}>You said</Text>
             <Text style={styles.userMessageText} numberOfLines={3} ellipsizeMode="tail">
@@ -116,14 +157,53 @@ export function IdeaScreen() {
         )}
       </ScrollView>
 
-      {/* Agent response — pinned above transcript, bold, scrollable if long */}
-      {session.lastAssistantMessage && (
+      {/* Agent response — streaming or completed */}
+      {(displayText || session.isSynthesizing) && (
         <View style={styles.agentMessage}>
-          <Text style={styles.cardLabel}>Advisor</Text>
+          {!session.isSynthesizing && <Text style={styles.cardLabel}>Advisor</Text>}
           <ScrollView style={styles.agentScroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <Text style={styles.agentText}>{session.lastAssistantMessage.content}</Text>
+            <Text style={styles.agentText}>
+              {displayText}
+              {session.isSynthesizing && session.streamingText
+                ? (
+                    <Text style={styles.cursor}>▌</Text>
+                  )
+                : null}
+            </Text>
           </ScrollView>
         </View>
+      )}
+
+      {/* Clarification block */}
+      {session.clarification && !session.isSynthesizing && (
+        <>
+          {session.clarification.type === 'single_choice' && session.clarification.options && (
+            <QuestionSingleChoice
+              question={session.clarification.question}
+              options={session.clarification.options}
+              onSelect={session.handleClarificationSelect}
+              isDisabled={session.isSending}
+            />
+          )}
+          {session.clarification.type === 'multi_select' && session.clarification.options && (
+            <QuestionMultiSelect
+              question={session.clarification.question}
+              options={session.clarification.options}
+              onSelect={session.handleClarificationSelect}
+              isDisabled={session.isSending}
+            />
+          )}
+          {session.clarification.type === 'confirm_cancel' && (
+            <QuestionConfirmCancel
+              question={session.clarification.question}
+              confirmLabel={session.clarification.confirmLabel ?? 'Confirm'}
+              cancelLabel={session.clarification.cancelLabel ?? 'Cancel'}
+              onConfirm={() => session.handleClarificationSelect(session.clarification!.confirmLabel ?? 'Confirm')}
+              onCancel={() => session.handleClarificationSelect(session.clarification!.cancelLabel ?? 'Cancel')}
+              isDisabled={session.isSending}
+            />
+          )}
+        </>
       )}
 
       {/* Transcript box — listening / stopping / preview */}
@@ -142,9 +222,9 @@ export function IdeaScreen() {
       <MicBottomBar
         statusText={statusText}
         isListening={recording.isListening}
-        isActive={recording.isListening || session.isSending}
-        isDisabled={isBusy || session.isSending || recording.isStopping || session.isPreview}
-        showSpinner={isBusy || session.isSending || recording.isStopping}
+        isActive={recording.isListening || session.isSynthesizing}
+        isDisabled={isBusy || session.isSynthesizing || recording.isStopping || session.isPreview}
+        showSpinner={isBusy || session.isSynthesizing || recording.isStopping}
         onPress={recording.toggleListening}
       />
     </View>
@@ -163,6 +243,21 @@ const styles = StyleSheet.create({
     color: colors.brand.dark,
     fontSize: 24,
     fontWeight: '700',
+  },
+  synthesizingTitle: {
+    color: '#A08060',
+    fontFamily: 'Georgia',
+    fontSize: 17,
+    fontStyle: 'italic',
+  },
+  spinner: {
+    borderBottomColor: 'transparent',
+    borderColor: '#C4773B',
+    borderLeftColor: 'transparent',
+    borderRadius: 16,
+    borderWidth: 2.5,
+    height: 32,
+    width: 32,
   },
   content: {
     paddingBottom: 24,
@@ -229,6 +324,10 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     lineHeight: 28,
+  },
+  cursor: {
+    color: '#C4773B',
+    fontSize: 17,
   },
   errorCard: {
     backgroundColor: '#FDE8E8',

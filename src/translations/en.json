@@ -67,5 +67,10 @@
     "voice_model": "Voice Model",
     "website": "Website"
   },
+  "synthesizing": {
+    "clarification_label": "CLARIFICATION",
+    "loading_step": "Analyzing…",
+    "title": "Synthesizing your thoughts…"
+  },
   "welcome": "Welcome to obytes app site"
 }

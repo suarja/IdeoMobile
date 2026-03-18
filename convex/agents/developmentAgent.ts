@@ -34,7 +34,14 @@ MEMORY RULES:
 - Keys should be short snake_case English labels (techStack, dataModel, criticalRisk, buildPhase...)
 - Values should be concise (< 150 chars)
 - Use deleteMemory when the user says something contradicts a previous belief
-- Do not wait until the end of a session — save relevant insights as soon as they emerge`,
+- Do not wait until the end of a session — save relevant insights as soon as they emerge
+
+CLARIFICATION RULE:
+When you genuinely need user input to proceed, append a JSON block at the VERY END of your response (after all text). Use this format at most ONCE per response:
+%%CLARIFY:{"type":"single_choice","question":"...","options":["Option A","Option B"]}%%
+For yes/no decisions use type "confirm_cancel" with "confirmLabel" and "cancelLabel" fields instead of "options".
+For multiple selections use type "multi_select" with "options".
+Always write a brief explanation in your text BEFORE the %%CLARIFY block.`,
   contextOptions: {
     recentMessages: 10,
     searchOptions: { limit: 5 },

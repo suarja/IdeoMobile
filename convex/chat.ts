@@ -1,10 +1,12 @@
 import type { Id } from './_generated/dataModel';
 import type { AgentType } from './agents/routerAgent';
 import { anthropic } from '@ai-sdk/anthropic';
+import { listUIMessages, syncStreams, vStreamArgs } from '@convex-dev/agent';
 import { generateText, tool } from 'ai';
+import { paginationOptsValidator } from 'convex/server';
 import { v } from 'convex/values';
 import { z } from 'zod';
-import { internal } from './_generated/api';
+import { components, internal } from './_generated/api';
 import { action, internalAction, internalMutation, internalQuery, mutation, query } from './_generated/server';
 import { generalAgent } from './agents/chatAgent';
 import { designAgent } from './agents/designAgent';
@@ -390,16 +392,17 @@ export const sendMessage = action({
 
     const { thread } = await selectedAgent.continueThread(ctx, { threadId });
     const allTools: any = { ...commonTools, ...specializedTools };
-    const result = await thread.generateText({
-      prompt: fullPrompt,
-      tools: allTools,
-    });
+    const result = await thread.streamText(
+      { prompt: fullPrompt, tools: allTools },
+      { saveStreamDeltas: true },
+    );
 
+    // Consume the stream to completion so deltas are fully committed before returning.
     // AI SDK v6: result.text = finalStep.text only.
     // If the last step ended with a tool call (e.g. saveProjectMemory after the response),
     // text is "" even if a prior step generated the actual response.
     // Fall back to the last step that produced non-empty text.
-    let responseText = result.text ?? '';
+    let responseText = (await result.text) ?? '';
     if (!responseText) {
       const steps = (result as any).steps as Array<{ text?: string }> | undefined;
       if (steps && steps.length > 0) {
@@ -429,6 +432,19 @@ export const listMessages = query({
       .withIndex('by_threadId', q => q.eq('threadId', threadId))
       .order('asc')
       .take(50);
+  },
+});
+
+export const listThreadMessages = query({
+  args: {
+    threadId: v.string(),
+    paginationOpts: paginationOptsValidator,
+    streamArgs: vStreamArgs,
+  },
+  handler: async (ctx, args) => {
+    const paginated = await listUIMessages(ctx, components.agent, args);
+    const streams = await syncStreams(ctx, components.agent, args);
+    return { ...paginated, streams };
   },
 });
 

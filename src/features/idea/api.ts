@@ -1,3 +1,4 @@
+import { useUIMessages } from '@convex-dev/agent/react';
 import { useAction, useConvexAuth, useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 
@@ -25,4 +26,12 @@ export function useCreateProject() {
 export function useActiveProject() {
   const { isAuthenticated } = useConvexAuth();
   return useQuery(api.projects.getActiveProject, isAuthenticated ? {} : 'skip');
+}
+
+export function useAgentThreadMessages(threadId: string | null) {
+  return useUIMessages(
+    api.chat.listThreadMessages,
+    threadId ? { threadId } : 'skip',
+    { initialNumItems: 30, stream: true },
+  );
 }
