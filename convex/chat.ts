@@ -70,7 +70,20 @@ export const getActiveThread = query({
 
     if (!project)
       return null;
-    return { threadId: project.threadId, title: project.name ?? null };
+
+    // Read the timestamp of the last message from the custom messages table.
+    // This is more reliable than _creationTime from agent thread messages.
+    const lastMsg = await ctx.db
+      .query('messages')
+      .withIndex('by_threadId', q => q.eq('threadId', project.threadId))
+      .order('desc')
+      .first();
+
+    return {
+      threadId: project.threadId,
+      title: project.name ?? null,
+      lastMessageAt: lastMsg?.createdAt ?? null,
+    };
   },
 });
 
@@ -290,6 +303,18 @@ function buildCommonTools(
         return JSON.stringify(scores);
       },
     }),
+    endSession: tool({
+      description: 'Call when a work session naturally concludes. Provide a summary, list of objectives accomplished, and suggested next steps. Do NOT call after quick single exchanges — only after substantive work sessions.',
+      inputSchema: z.object({
+        summary: z.string().describe('1-2 sentence summary of what was accomplished this session'),
+        objectives: z.array(z.string()).describe('List of goals or tasks covered in this session'),
+        nextSteps: z.array(z.string()).describe('Suggested actions for the next session'),
+      }),
+      execute: async ({ summary, objectives, nextSteps }) => {
+        const payload = JSON.stringify({ summary, objectives, nextSteps });
+        return `%%SESSION_END%%${payload}`;
+      },
+    }),
   };
 }
 
@@ -411,6 +436,9 @@ export const sendMessage = action({
       }
     }
     await ctx.runMutation(internal.chat.insertMessage, { threadId, role: 'assistant', content: responseText });
+
+    // Auto-award session points after every agent response (15 pts base; streak only on new sessions)
+    await ctx.runMutation(internal.gamification.addSessionPoints, { threadId, basePoints: 15 });
 
     if (messageCount === 0) {
       await ctx.scheduler.runAfter(0, internal.chat.generateThreadTitle, { threadId, content });

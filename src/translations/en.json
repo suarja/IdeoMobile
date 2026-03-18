@@ -7,10 +7,15 @@
     "title": "Focus"
   },
   "idea": {
+    "continuation_prompt": "Pick up where we left off?",
     "cta": "Talk about your idea",
     "empty_hint": "No idea yet.",
     "empty_hint2": "Tap the mic to start.",
-    "subtitle": "Press and describe what you want to build",
+    "session_end_next_steps": "Prochaines étapes",
+    "session_end_objectives": "Objectifs",
+    "session_end_summary": "Résumé",
+    "session_end_title": "Session terminée",
+    "subtitle": "Press mic · Write",
     "title_placeholder": "New idea…"
   },
   "onboarding": {

@@ -260,20 +260,32 @@ export const addGoal = mutation({
 // ---------------------------------------------------------------------------
 
 export const addSessionPoints = internalMutation({
-  args: { threadId: v.string() },
-  handler: async (ctx, { threadId }) => {
+  args: { threadId: v.string(), basePoints: v.optional(v.number()) },
+  handler: async (ctx, { threadId, basePoints = 50 }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity)
       return; // silently skip if unauthenticated
 
     const userId = identity.subject;
     const now = Date.now();
+    const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
     const TWO_DAYS_MS = 48 * 60 * 60 * 1000;
 
     const stats = await ctx.db
       .query('userStats')
       .withIndex('by_userId', q => q.eq('userId', userId))
       .first();
+
+    const isSameSession = stats && stats.lastSessionAt && (now - stats.lastSessionAt) < THREE_HOURS_MS;
+
+    if (isSameSession) {
+      // Same session: grant base points only, no streak update
+      const newTotal = (stats.totalPoints ?? 0) + basePoints;
+      const newLevel = await computeLevel(ctx, newTotal);
+      await ctx.db.patch(stats._id, { totalPoints: newTotal, currentLevel: newLevel, lastSessionAt: now });
+      await ctx.db.insert('voiceSessions', { userId, threadId, pointsEarned: basePoints, createdAt: now });
+      return { pointsEarned: basePoints, newStreak: stats.currentStreak };
+    }
 
     let newStreak = 1;
     let longestStreak = stats?.longestStreak ?? 1;
@@ -283,9 +295,9 @@ export const addSessionPoints = internalMutation({
     }
     longestStreak = Math.max(longestStreak, newStreak);
 
-    // 50 base + 10 per streak day, capped at 50 bonus
+    // base + 10 per streak day, capped at 50 bonus
     const streakBonus = Math.min(newStreak * 10, 50);
-    const pointsEarned = 50 + streakBonus;
+    const pointsEarned = basePoints + streakBonus;
     const newTotal = (stats?.totalPoints ?? 0) + pointsEarned;
     const newLevel = await computeLevel(ctx, newTotal);
 
@@ -682,5 +694,68 @@ export const createDailyChallengeInternal = internalMutation({
       points,
       completed: false,
     });
+  },
+});
+
+// ---------------------------------------------------------------------------
+// App open tracking
+// ---------------------------------------------------------------------------
+
+export const recordAppOpen = mutation({
+  args: {},
+  handler: async (ctx): Promise<{ skipped: boolean; pointsEarned?: number }> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      return { skipped: true };
+
+    const userId = identity.subject;
+    const now = Date.now();
+    const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+
+    const stats = await ctx.db
+      .query('userStats')
+      .withIndex('by_userId', q => q.eq('userId', userId))
+      .first();
+
+    // Skip if app was opened less than 3 hours ago
+    if (stats && stats.lastSessionAt && (now - stats.lastSessionAt) < THREE_HOURS_MS) {
+      return { skipped: true };
+    }
+
+    const pointsEarned = 5;
+    await grantPoints(ctx, userId, pointsEarned);
+
+    // Update lastSessionAt so subsequent opens within 3h are skipped
+    const updatedStats = await ctx.db
+      .query('userStats')
+      .withIndex('by_userId', q => q.eq('userId', userId))
+      .first();
+    if (updatedStats) {
+      await ctx.db.patch(updatedStats._id, { lastSessionAt: now });
+    }
+
+    return { skipped: false, pointsEarned };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Standup time preference
+// ---------------------------------------------------------------------------
+
+export const setStandupTime = mutation({
+  args: { time: v.string() }, // "HH:MM" format
+  handler: async (ctx, { time }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      throw new Error('Unauthenticated');
+    const userId = identity.subject;
+
+    const stats = await ctx.db
+      .query('userStats')
+      .withIndex('by_userId', q => q.eq('userId', userId))
+      .first();
+    if (stats) {
+      await ctx.db.patch(stats._id, { standupTime: time });
+    }
   },
 });

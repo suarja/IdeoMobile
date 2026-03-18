@@ -1,7 +1,7 @@
 import type { RefObject } from 'react';
 
 import { Ionicons } from '@expo/vector-icons';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 
 import { colors, Text, View } from '@/components/ui';
 
@@ -13,16 +13,17 @@ type Props = {
   transcriptScrollRef: RefObject<ScrollView | null>;
   onSend: () => void;
   onCancel: () => void;
+  onTranscriptEdit?: (text: string) => void;
 };
 
 export function TranscriptBox({
-  isListening,
   isStopping,
   isPreview,
   transcript,
   transcriptScrollRef,
   onSend,
   onCancel,
+  onTranscriptEdit,
 }: Props) {
   return (
     <View style={[styles.container, isPreview && styles.containerPreview]}>
@@ -33,18 +34,31 @@ export function TranscriptBox({
               <Text style={styles.stoppingText}>Processing…</Text>
             </View>
           )
-        : (
-            // scrollEnabled off during listening: shows last phrase only (maxHeight: 44)
-            // scrollEnabled on in preview: user can review full text
-            <ScrollView
-              ref={transcriptScrollRef}
-              style={isListening ? styles.scrollListening : styles.scrollPreview}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={isPreview}
-            >
-              <Text style={styles.transcriptText}>{transcript || '…'}</Text>
-            </ScrollView>
-          )}
+        : isPreview
+          ? (
+              // Editable in preview mode
+              <TextInput
+                style={[styles.transcriptText, styles.editableInput]}
+                value={transcript || ''}
+                onChangeText={onTranscriptEdit}
+                multiline
+                scrollEnabled
+                placeholder="…"
+                placeholderTextColor={colors.brand.muted}
+                autoCorrect
+              />
+            )
+          : (
+              // Read-only while listening
+              <ScrollView
+                ref={transcriptScrollRef}
+                style={styles.scrollListening}
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={false}
+              >
+                <Text style={styles.transcriptText}>{transcript || '…'}</Text>
+              </ScrollView>
+            )}
 
       {isPreview && (
         <View style={styles.actions}>
@@ -93,13 +107,14 @@ const styles = StyleSheet.create({
   scrollListening: {
     maxHeight: 44,
   },
-  scrollPreview: {
-    maxHeight: 96,
-  },
   transcriptText: {
     color: colors.brand.dark,
     fontSize: 15,
     lineHeight: 22,
+  },
+  editableInput: {
+    maxHeight: 96,
+    paddingVertical: 0,
   },
   actions: {
     flexDirection: 'row',

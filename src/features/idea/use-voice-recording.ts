@@ -11,6 +11,8 @@ type VoiceRecording = {
   /** Toggle mic on/off. Calls onRecordingComplete when a non-empty transcript is ready. */
   toggleListening: () => Promise<void>;
   clearTranscript: () => void;
+  /** Manually override the transcript text (e.g. from editable preview). */
+  setTranscript: (text: string) => void;
 };
 
 type Options = {
@@ -135,5 +137,6 @@ export function useVoiceRecording({ whisperContext, onRecordingComplete }: Optio
     transcriptScrollRef,
     toggleListening,
     clearTranscript,
+    setTranscript,
   };
 }

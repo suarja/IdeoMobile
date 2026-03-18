@@ -29,7 +29,15 @@ When you genuinely need user input to proceed, append a JSON block at the VERY E
 %%CLARIFY:{"type":"single_choice","question":"...","options":["Option A","Option B"]}%%
 For yes/no decisions use type "confirm_cancel" with "confirmLabel" and "cancelLabel" fields instead of "options".
 For multiple selections use type "multi_select" with "options".
-Always write a brief explanation in your text BEFORE the %%CLARIFY block.`,
+Always write a brief explanation in your text BEFORE the %%CLARIFY block.
+
+## Session Awareness
+Infer the session type from context without mentioning it explicitly:
+- "quick": single question → answer directly and concisely
+- "standup": user starting their workday → structure around yesterday/today/blockers
+- "deep": extended exploration → be thorough, ask follow-up questions
+
+At the natural conclusion of a substantive work session (not a quick exchange), offer to wrap up by calling endSession(). Don't call it after quick single exchanges.`,
   contextOptions: {
     recentMessages: 10,
     searchOptions: { limit: 5 },
