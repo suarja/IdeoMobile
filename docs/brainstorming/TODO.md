@@ -1,21 +1,12 @@
 ## Bugs
 
 ### UI
-- La bottom sheet modal qui concerne les chips, je sais pas comment ils s'appellent, dans la page centrale, le composant destiné à savoir si l'utilisateur veut continuer ou choisir un autre sujet lorsqu'ils cliquent sur un autre sujet.
-
-Le bottom sheet modal sourd le bottom sheet modal. Le contenu est aligné en bas, donc faudrait la ligne en rose. Je pense que la bottom sheet modal n'est pas la même couleur, n'a pas les bonnes couleurs, ni le bon design et les pas les bons divider. Tout ça est riche. 
 
 - Dans le composant, donc les gens forment component. Il faudrait pouvoir avoir un bouton pour valider le choix, parce que là actuellement des comptes cliquent sur l'une des options. Il n'y a pas de possibilité de changer d'avis et ensuite de valider, par exemple. Il faudrait ajouter un bouton valider et que le bouton, donc la check box, passe soit sélectionnée. Qu'on passe le composant d'état à l'état sélectionné. 
 
 - Lors du streaming de la réponse de l'agent, il y a un scroll to the bottom jusqu'à la fin du message, où le scroll to bottom s'arrête. Potentiellement, si le message est très long, on ne voit pas la fin du message, puisqu'on n'est pas scrolled to the bottom. On est resté à un moment, comment dire? La fin du message arrive et du coup on perd le scroll to bottom. Voilà, donc il faudrait à la fin du message scroll to the bottom. 
 
 - Lorsque l'agent renvoie un message de clarification dans le streaming, avant que ce soit rendérisé en Agent Form Component, on voit le format utilisé par l'agent. 
-
-- Il faudrait aussi rendre le markdown. En fait, l'agent répond au markdown, et il y a notamment, par exemple, les messages qui sont bold. Il faudrait soit escaper le markdown, moi je pense que soit on dit à l'agent de ne pas répondre au markdown, parce qu'en plus nous on utilise déjà une police qui est bold, donc je sais pas comment on pourrait faire.
-
-Vaut mieux escaper les bold, le texte en gras. Ou alors on essaye de rendre le texte en gras d'une autre façon, grâce. Faut duuuu, comment on peut faire? 
-
-- Concernant la barre de navigation, il y a trop d'espace entre l'icône et le texte. Il faudrait rapprocher le texte et l'icône. 
 
 
 
@@ -40,7 +31,6 @@ Shared SYSTEM_CHALLENGE_POOL, pickRandom, and
 - Il faudrait blocker la demande de complétion des challenges une fois toutes les heures 
 - change the way the agent formulates its response to adress to the user directly and have the user context?
 
-- Il faudrait ajouter un module comme sur GitHub pour la daily streak, plutôt que de l'avoir dans la progress bar. À voir le petit indicateur pour le habit tracker. Je peux, comment ça s'appelle exactement, là où on voit les petits carrés verts, la petite pour l'activité sur la plateforme? 
 
 
 

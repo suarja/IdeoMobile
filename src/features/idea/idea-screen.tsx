@@ -9,8 +9,10 @@ import { colors, FocusAwareStatusBar, Text, View } from '@/components/ui';
 import { useWhisperModels } from '@/lib/hooks/use-whisper-models';
 import { translate } from '@/lib/i18n';
 
+import { storage } from '@/lib/storage';
 import { api } from '../../../convex/_generated/api';
 import { useActiveThread, useMessages } from './api';
+import { DailyStreakModal } from './components/daily-streak-modal';
 import { MicBottomBar } from './components/mic-bottom-bar';
 import { PointsBanner } from './components/points-banner';
 import { QuestionConfirmCancel } from './components/question-confirm-cancel';
@@ -132,12 +134,34 @@ export function IdeaScreen() {
   // Latch: user explicitly pressed "Fin" — hide button until next session
   const [sessionEndRequested, setSessionEndRequested] = useState(false);
 
+  // Streak modal data
+  const [streakData, setStreakData] = useState<{ currentStreak: number; activeDays: string[] } | null>(null);
+  const [showStreakModal, setShowStreakModal] = useState(false);
+
   // Award app-open points on mount
   useEffect(() => {
     recordAppOpen()
       .then((result) => {
         if (!result.skipped && result.pointsEarned) {
           setPendingPoints(result.pointsEarned);
+        }
+
+        // Always save streak data so we can display it if user manually opens it or later
+        if (result.currentStreak !== undefined && result.activeDays) {
+          setStreakData({
+            currentStreak: result.currentStreak,
+            activeDays: result.activeDays as string[],
+          });
+        }
+
+        // Show modal logic
+        if (result.isNewStreakDay && result.currentStreak && result.activeDays) {
+          const today = new Date().toISOString().split('T')[0];
+          const lastShown = storage.getString('@ideo_last_streak_modal_date');
+          if (lastShown !== today) {
+            storage.set('@ideo_last_streak_modal_date', today);
+            setShowStreakModal(true);
+          }
         }
       })
       .catch(console.error);
@@ -382,6 +406,14 @@ export function IdeaScreen() {
           }
         }}
         onSend={handleSend}
+      />
+
+      {/* Daily Streak Modal */}
+      <DailyStreakModal
+        visible={showStreakModal}
+        currentStreak={streakData?.currentStreak ?? 0}
+        activeDays={streakData?.activeDays ?? []}
+        onClose={() => setShowStreakModal(false)}
       />
     </KeyboardAvoidingView>
   );

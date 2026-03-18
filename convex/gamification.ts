@@ -46,6 +46,7 @@ async function grantPoints(ctx: MutationCtx, userId: string, points: number): Pr
       currentStreak: 1,
       longestStreak: 0,
       lastSessionAt: 0,
+      activeDays: [],
     });
   }
 }
@@ -122,6 +123,7 @@ export const getUserStats = query({
       levelIcon: currentLevelData?.iconEmoji ?? '🌱',
       currentStreak: stats?.currentStreak ?? 0,
       longestStreak: stats?.longestStreak ?? 0,
+      activeDays: stats?.activeDays ?? [],
       pointsToNextLevel,
       progressToNextLevel,
       nextLevelName: nextLevelData?.name ?? null,
@@ -320,6 +322,7 @@ export const addSessionPoints = internalMutation({
         currentStreak: newStreak,
         longestStreak,
         lastSessionAt: now,
+        activeDays: [utcDateString()],
       });
     }
   },
@@ -541,6 +544,7 @@ export const initNewUser = internalMutation({
         currentStreak: 0,
         longestStreak: 0,
         lastSessionAt: 0,
+        activeDays: [],
       });
     }
 
@@ -654,6 +658,7 @@ export const getUserStatsInternal = internalQuery({
       currentStreak: stats.currentStreak,
       longestStreak: stats.longestStreak,
       lastSessionAt: stats.lastSessionAt,
+      activeDays: stats.activeDays ?? [],
     };
   },
 });
@@ -703,38 +708,98 @@ export const createDailyChallengeInternal = internalMutation({
 
 export const recordAppOpen = mutation({
   args: {},
-  handler: async (ctx): Promise<{ skipped: boolean; pointsEarned?: number }> => {
+  handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity)
       return { skipped: true };
 
     const userId = identity.subject;
     const now = Date.now();
-    const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+    const todayStr = utcDateString();
 
     const stats = await ctx.db
       .query('userStats')
       .withIndex('by_userId', q => q.eq('userId', userId))
       .first();
 
-    // Skip if app was opened less than 3 hours ago
-    if (stats && stats.lastSessionAt && (now - stats.lastSessionAt) < THREE_HOURS_MS) {
-      return { skipped: true };
+    const activeDays = stats?.activeDays ?? [];
+
+    // Check if the user has already opened the app today
+    if (activeDays.includes(todayStr)) {
+      // Still check if we should skip points based on lastSessionAt (3 hours)
+      const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+      if (stats && stats.lastSessionAt && (now - stats.lastSessionAt) < THREE_HOURS_MS) {
+        return { skipped: true, activeDays, currentStreak: stats.currentStreak };
+      }
+
+      const pointsEarned = 5;
+      await grantPoints(ctx, userId, pointsEarned);
+
+      // Only update lastSessionAt if returning points, but don't add duplicate activeDays
+      await ctx.db.patch(stats!._id, { lastSessionAt: now });
+      return { skipped: false, pointsEarned, activeDays, currentStreak: stats!.currentStreak };
     }
 
+    // --- First open of the day ---
+
+    // Calculate the new streak
+    const yesterday = new Date(now - 24 * 60 * 60 * 1000);
+    const yY = yesterday.getUTCFullYear();
+    const yM = String(yesterday.getUTCMonth() + 1).padStart(2, '0');
+    const yD = String(yesterday.getUTCDate()).padStart(2, '0');
+    const yesterdayStr = `${yY}-${yM}-${yD}`;
+
+    let newStreak = 1;
+    if (activeDays.includes(yesterdayStr) || activeDays.length === 0) {
+      newStreak = (stats?.currentStreak ?? 0) + 1; // Or start at 1 if very first time
+    }
+
+    const newLongestStreak = Math.max(stats?.longestStreak ?? 0, newStreak);
+    const newActiveDays = [...activeDays, todayStr];
+
+    // Safety check so array doesn't get ridiculously large over years
+    // Keeping exactly 1000 days should be around ~10KB and last almost 3 years. We don't really need to trim it but just in case:
+    if (newActiveDays.length > 1000) {
+      newActiveDays.shift(); // remove oldest
+    }
+
+    // Award standard points
     const pointsEarned = 5;
     await grantPoints(ctx, userId, pointsEarned);
 
-    // Update lastSessionAt so subsequent opens within 3h are skipped
+    // Update stats with the new steak and day
     const updatedStats = await ctx.db
       .query('userStats')
       .withIndex('by_userId', q => q.eq('userId', userId))
       .first();
+
     if (updatedStats) {
-      await ctx.db.patch(updatedStats._id, { lastSessionAt: now });
+      await ctx.db.patch(updatedStats._id, {
+        lastSessionAt: now,
+        currentStreak: newStreak,
+        longestStreak: newLongestStreak,
+        activeDays: newActiveDays,
+      });
+    }
+    else {
+      await ctx.db.insert('userStats', {
+        userId,
+        totalPoints: pointsEarned,
+        currentLevel: 1,
+        currentStreak: newStreak,
+        longestStreak: newLongestStreak,
+        lastSessionAt: now,
+        activeDays: newActiveDays,
+      });
     }
 
-    return { skipped: false, pointsEarned };
+    return {
+      skipped: false,
+      pointsEarned,
+      isNewStreakDay: true,
+      currentStreak: newStreak,
+      activeDays: newActiveDays,
+    };
   },
 });
 

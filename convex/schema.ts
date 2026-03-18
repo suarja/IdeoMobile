@@ -34,6 +34,7 @@ export default defineSchema({
     currentStreak: v.number(),
     longestStreak: v.number(),
     lastSessionAt: v.number(),
+    activeDays: v.optional(v.array(v.string())), // YYYY-MM-DD
     standupTime: v.optional(v.string()), // "HH:MM" format for daily standup reminder
   }).index('by_userId', ['userId']),
 

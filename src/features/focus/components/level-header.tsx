@@ -1,6 +1,7 @@
 import type { LayoutChangeEvent } from 'react-native';
 import type { useUserStats } from '../api';
 import { useEffect, useRef, useState } from 'react';
+import { TouchableOpacity } from 'react-native';
 
 import Animated, {
   Easing,
@@ -16,10 +17,11 @@ import { SparkBurst } from './spark-burst';
 
 type LevelHeaderProps = {
   stats: ReturnType<typeof useUserStats>;
+  onStreakPress?: () => void;
 };
 
 // eslint-disable-next-line max-lines-per-function -- multi-burst timeouts require setState in effect
-export function LevelHeader({ stats }: LevelHeaderProps) {
+export function LevelHeader({ stats, onStreakPress }: LevelHeaderProps) {
   const progressAnim = useSharedValue(0);
   const prevProgressRef = useRef<number | null>(null);
   const [emberTrigger, setEmberTrigger] = useState(false);
@@ -64,6 +66,12 @@ export function LevelHeader({ stats }: LevelHeaderProps) {
     width: `${progressAnim.value}%`,
     backgroundColor: colors.brand.dark,
     borderRadius: 999,
+    // Add a slight glow/shadow to the bar itself
+    shadowColor: colors.brand.dark,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   }));
 
   // Spark container follows leading edge of animated bar in real-time
@@ -117,10 +125,33 @@ export function LevelHeader({ stats }: LevelHeaderProps) {
   const nextLevelMinPoints = totalPoints + pointsToNextLevel;
 
   return (
-    <View className="mb-4 rounded-2xl p-4" style={{ backgroundColor: colors.brand.border, gap: 10 }}>
+    <View
+      className="mb-4 rounded-2xl p-4"
+      style={{
+        backgroundColor: colors.brand.border,
+        gap: 12,
+        shadowColor: colors.brand.dark,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 5,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.05)',
+      }}
+    >
       {/* Row 1 — Level badge + streak chip aligned */}
       <View className="flex-row items-center justify-between">
-        <View className="self-start rounded-full px-3 py-1" style={{ backgroundColor: colors.brand.dark }}>
+        <View
+          className="self-start rounded-full px-3 py-1"
+          style={{
+            backgroundColor: colors.brand.dark,
+            shadowColor: colors.brand.dark,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.2,
+            shadowRadius: 4,
+            elevation: 3,
+          }}
+        >
           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.brand.bg }}>
             {levelIcon}
             {'  '}
@@ -128,14 +159,26 @@ export function LevelHeader({ stats }: LevelHeaderProps) {
           </Text>
         </View>
         {currentStreak > 0 && (
-          <View className="rounded-full px-3 py-1" style={{ backgroundColor: colors.brand.selected }}>
-            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.brand.dark }}>
+          <TouchableOpacity
+            className="rounded-full px-3 py-1"
+            style={{
+              backgroundColor: colors.brand.selected,
+              shadowColor: colors.brand.dark,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 3,
+              elevation: 4,
+            }}
+            onPress={onStreakPress}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.brand.dark }}>
               🔥
               {' '}
               {currentStreak}
               -day streak
             </Text>
-          </View>
+          </TouchableOpacity>
         )}
       </View>
 
@@ -144,7 +187,11 @@ export function LevelHeader({ stats }: LevelHeaderProps) {
         {/* Track — overflow visible so sparks can escape */}
         <View
           className="flex-1 rounded-full"
-          style={{ height: 8, backgroundColor: 'rgba(67,56,49,0.2)', overflow: 'visible' }}
+          style={{
+            height: 8,
+            backgroundColor: 'rgba(67,56,49,0.2)',
+            overflow: 'visible',
+          }}
           onLayout={handleTrackLayout}
         >
           <Animated.View style={barStyle} />

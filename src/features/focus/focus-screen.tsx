@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Modal, TouchableOpacity } from 'react-native';
 
 import { colors, FocusAwareStatusBar, ScrollView, Text, View } from '@/components/ui';
+import { DailyStreakModal } from '../idea/components/daily-streak-modal';
 import {
   localDateString,
   useActiveThreadId,
@@ -291,6 +292,7 @@ export function FocusScreen() {
   const scores = useProjectScores(threadId ?? null);
   const stats = useUserStats();
   const { showModal, levelUpData, dismiss } = useLevelUpDetection(stats);
+  const [showStreakModal, setShowStreakModal] = useState(false);
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.brand.bg }}>
@@ -300,7 +302,7 @@ export function FocusScreen() {
           <Text className="mb-6 text-2xl font-bold" style={{ color: colors.brand.dark }}>
             Focus
           </Text>
-          <LevelHeader stats={stats} />
+          <LevelHeader stats={stats} onStreakPress={() => setShowStreakModal(true)} />
           <RadarChart scores={scores} />
           <DailyChallengesSection />
           <ProjectGoalsSection />
@@ -315,6 +317,12 @@ export function FocusScreen() {
           onDismiss={dismiss}
         />
       )}
+      <DailyStreakModal
+        visible={showStreakModal}
+        currentStreak={stats?.currentStreak ?? 0}
+        activeDays={stats?.activeDays ?? []}
+        onClose={() => setShowStreakModal(false)}
+      />
     </View>
   );
 }
