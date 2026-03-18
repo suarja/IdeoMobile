@@ -46,6 +46,7 @@ function DimensionBadge({ dimension }: { dimension: string }) {
   );
 }
 
+// eslint-disable-next-line max-lines-per-function -- expanded stylistic layout increases line count
 function ChallengeRow({
   item,
   threadId,
@@ -83,16 +84,28 @@ function ChallengeRow({
   };
 
   return (
-    <View className="flex-row items-center border-b py-3" style={{ borderColor: colors.brand.border }}>
+    <View
+      className="mb-3 flex-row items-center rounded-2xl p-4"
+      style={{
+        backgroundColor: colors.brand.card,
+        shadowColor: colors.brand.dark,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.03)',
+      }}
+    >
       {/* Checkbox with overflow visible for spark burst */}
-      <View style={{ overflow: 'visible' }}>
+      <View style={{ overflow: 'visible', marginRight: 12 }}>
         <TouchableOpacity
           onPress={handlePress}
           disabled={validating || item.completed}
           style={{
-            width: 22,
-            height: 22,
-            borderRadius: 11,
+            width: 24,
+            height: 24,
+            borderRadius: 12,
             borderWidth: 1.5,
             borderColor: colors.brand.dark,
             backgroundColor: item.completed ? colors.brand.dark : 'transparent',
@@ -114,20 +127,43 @@ function ChallengeRow({
           radius={30}
         />
       </View>
-      <Text
-        className="flex-1 px-3"
+      <View className="flex-1">
+        <Text
+          style={{
+            fontSize: 15,
+            fontWeight: '600',
+            color: item.completed ? colors.brand.muted : colors.brand.dark,
+            textDecorationLine: item.completed ? 'line-through' : 'none',
+          }}
+        >
+          {item.label}
+        </Text>
+        {item.dimension && (
+          <View className="mt-1 flex-row items-center">
+            <DimensionBadge dimension={item.dimension} />
+          </View>
+        )}
+      </View>
+      <View
+        className="ml-3 rounded-full px-3 py-1"
         style={{
-          color: item.completed ? colors.brand.muted : colors.brand.dark,
-          textDecorationLine: item.completed ? 'line-through' : 'none',
+          backgroundColor: colors.brand.card,
+          borderWidth: 1,
+          borderColor: 'rgba(0,0,0,0.05)',
+          shadowColor: colors.brand.dark,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 3,
+          elevation: 2,
         }}
       >
-        {item.label}
-      </Text>
-      {item.dimension && <DimensionBadge dimension={item.dimension} />}
-      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.brand.muted, marginLeft: 8 }}>
-        +
-        {item.points}
-      </Text>
+        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.brand.dark }}>
+          +
+          {item.points}
+          {' '}
+          pts
+        </Text>
+      </View>
     </View>
   );
 }
@@ -143,7 +179,7 @@ function DailyChallengesSection() {
   return (
     <View className="mb-6">
       <View className="mb-3 flex-row items-center justify-between">
-        <Text style={{ fontSize: 18, fontWeight: '600', color: colors.brand.dark }}>
+        <Text style={{ fontSize: 20, fontWeight: '800', color: colors.brand.dark, letterSpacing: -0.5 }}>
           Daily challenges
         </Text>
         {completedCount < totalCount && totalCount > 0 && (
@@ -216,13 +252,26 @@ function DailyChallengesSection() {
 function GoalRow({ item, onComplete }: { item: ProjectGoal; onComplete: () => void }) {
   const isAgent = item.createdBy.startsWith('agent') || item.createdBy === 'system';
   return (
-    <View className="flex-row items-center border-b py-3" style={{ borderColor: colors.brand.border }}>
+    <View
+      className="mb-3 flex-row items-center rounded-2xl p-4"
+      style={{
+        backgroundColor: colors.brand.card,
+        shadowColor: colors.brand.dark,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.03)',
+      }}
+    >
       <TouchableOpacity
         onPress={onComplete}
         style={{
-          width: 18,
-          height: 18,
-          borderRadius: 9,
+          marginRight: 12,
+          width: 24,
+          height: 24,
+          borderRadius: 12,
           borderWidth: 1.5,
           borderColor: colors.brand.dark,
           backgroundColor: item.completed ? colors.brand.dark : 'transparent',
@@ -231,12 +280,14 @@ function GoalRow({ item, onComplete }: { item: ProjectGoal; onComplete: () => vo
         }}
       >
         {item.completed && (
-          <Text style={{ fontSize: 11, color: colors.white }}>✓</Text>
+          <Text style={{ fontSize: 13, color: colors.white }}>✓</Text>
         )}
       </TouchableOpacity>
-      <View className="flex-1 px-3">
+      <View className="flex-1">
         <Text
           style={{
+            fontSize: 15,
+            fontWeight: '600',
             color: item.completed ? colors.brand.muted : colors.brand.dark,
             textDecorationLine: item.completed ? 'line-through' : 'none',
           }}
@@ -244,16 +295,32 @@ function GoalRow({ item, onComplete }: { item: ProjectGoal; onComplete: () => vo
           {item.title}
         </Text>
         {item.dimension && (
-          <Text style={{ fontSize: 11, color: colors.brand.muted, marginTop: 2 }}>
-            {item.dimension}
-          </Text>
+          <View className="mt-1 flex-row items-center">
+            <DimensionBadge dimension={item.dimension} />
+          </View>
         )}
       </View>
-      <Text style={{ fontSize: 16 }}>{isAgent ? '🤖' : '👤'}</Text>
-      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.brand.muted, marginLeft: 8 }}>
-        +
-        {item.points}
-      </Text>
+      <Text style={{ fontSize: 18, marginRight: 8 }}>{isAgent ? '🤖' : '👤'}</Text>
+      <View
+        className="rounded-full px-3 py-1"
+        style={{
+          backgroundColor: colors.brand.card,
+          borderWidth: 1,
+          borderColor: 'rgba(0,0,0,0.05)',
+          shadowColor: colors.brand.dark,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 3,
+          elevation: 2,
+        }}
+      >
+        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.brand.dark }}>
+          +
+          {item.points}
+          {' '}
+          pts
+        </Text>
+      </View>
     </View>
   );
 }
@@ -269,7 +336,7 @@ function ProjectGoalsSection() {
 
   return (
     <View className="mb-6">
-      <Text className="mb-3" style={{ fontSize: 18, fontWeight: '600', color: colors.brand.dark }}>
+      <Text className="mb-3" style={{ fontSize: 20, fontWeight: '800', color: colors.brand.dark, letterSpacing: -0.5 }}>
         Goals
       </Text>
       {goals.map(item => (
