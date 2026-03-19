@@ -88,6 +88,13 @@ export default defineSchema({
     .index('by_threadId', ['threadId'])
     .index('by_userId', ['userId']),
 
+  dailyMoods: defineTable({
+    userId: v.string(),
+    date: v.string(), // YYYY-MM-DD
+    moodScore: v.number(), // 1 to 5
+    createdAt: v.number(),
+  }).index('by_userId_date', ['userId', 'date']),
+
   // --- Projects & Memory ---
 
   projects: defineTable({

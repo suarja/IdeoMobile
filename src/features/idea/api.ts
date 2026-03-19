@@ -35,3 +35,7 @@ export function useAgentThreadMessages(threadId: string | null) {
     { initialNumItems: 30, stream: true },
   );
 }
+
+export function useSaveDailyMood() {
+  return useMutation(api.gamification.saveDailyMood);
+}

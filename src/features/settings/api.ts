@@ -15,3 +15,7 @@ export function useUserProfile() {
 export function useUpsertUserProfile() {
   return useMutation(api.userProfiles.upsertUserProfile);
 }
+
+export function useSetStandupTime() {
+  return useMutation(api.gamification.setStandupTime);
+}

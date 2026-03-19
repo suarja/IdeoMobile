@@ -1,5 +1,6 @@
 import { useAuth, useUser } from '@clerk/expo';
 
+import { Ionicons } from '@expo/vector-icons';
 import Env from 'env';
 import * as StoreReview from 'expo-store-review';
 import { useState } from 'react';
@@ -14,7 +15,9 @@ import {
 import { Github, Rate, Share as ShareIcon, Support, Website } from '@/components/ui/icons';
 import { useModal } from '@/components/ui/modal';
 import { translate } from '@/lib/i18n';
-import { useAppConfig, useUpsertUserProfile, useUserProfile } from './api';
+import { useUserStats } from '../focus/api';
+import { useAppConfig, useSetStandupTime, useUpsertUserProfile, useUserProfile } from './api';
+import { DevStorageBottomSheet } from './components/dev-storage-bottom-sheet';
 import { EditSocialLinksBottomSheet } from './components/edit-social-links-bottom-sheet';
 import { LanguageItem } from './components/language-item';
 import { MemoryItem } from './components/memory-bottom-sheet';
@@ -22,6 +25,7 @@ import { ProjectsItem } from './components/projects-bottom-sheet';
 import { SettingsContainer } from './components/settings-container';
 import { SettingsItem } from './components/settings-item';
 import { SocialLinkRow } from './components/social-link-row';
+import { StandupTimeBottomSheet } from './components/standup-time-bottom-sheet';
 import { UserAvatar } from './components/user-avatar';
 import { WhisperModelItem } from './components/whisper-model-item';
 
@@ -146,15 +150,60 @@ function LinksSection({ iconColor, appConfig }: LinksSectionProps) {
   );
 }
 
+function SocialSection({
+  openPlatform,
+  getLinksForPlatform,
+}: {
+  openPlatform: (p: Platform) => void;
+  getLinksForPlatform: (p: Platform) => any[];
+}) {
+  return (
+    <SettingsContainer title="settings.my_profile">
+      <SocialLinkRow platform="github" links={getLinksForPlatform('github')} onPress={() => openPlatform('github')} />
+      <SocialLinkRow platform="instagram" links={getLinksForPlatform('instagram')} onPress={() => openPlatform('instagram')} />
+      <SocialLinkRow platform="tiktok" links={getLinksForPlatform('tiktok')} onPress={() => openPlatform('tiktok')} />
+      <SocialLinkRow platform="website" links={getLinksForPlatform('website')} onPress={() => openPlatform('website')} />
+    </SettingsContainer>
+  );
+}
+
+function SectionAgent() {
+  return (
+    <SettingsContainer title="settings.agent">
+      <MemoryItem />
+      <ProjectsItem />
+    </SettingsContainer>
+  );
+}
+
+function SectionAbout({ appConfig }: { appConfig: any }) {
+  const iconColor = colors.brand.muted;
+  return (
+    <>
+      <SettingsContainer title="settings.about">
+        <SettingsItem text="settings.app_name" value={Env.EXPO_PUBLIC_NAME} />
+        <SettingsItem text="settings.version" value={Env.EXPO_PUBLIC_VERSION} />
+      </SettingsContainer>
+
+      <SupportSection iconColor={iconColor} appConfig={appConfig} />
+      <LinksSection iconColor={iconColor} appConfig={appConfig} />
+    </>
+  );
+}
+
 export function SettingsScreen() {
   const { signOut } = useAuth();
   const appConfig = useAppConfig();
   const userProfile = useUserProfile();
+  const userStats = useUserStats();
   const upsertUserProfile = useUpsertUserProfile();
+  const setStandupTime = useSetStandupTime();
   const iconColor = colors.brand.muted;
 
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
   const editModal = useModal();
+  const standupTimeModal = useModal();
+  const devModal = useModal();
 
   const { getLinksForPlatform, handleSocialSave } = buildSocialHandlers(
     selectedPlatform,
@@ -180,44 +229,34 @@ export function SettingsScreen() {
           </SettingsContainer>
 
           <SettingsContainer title="settings.my_profile">
-            <SocialLinkRow
-              platform="github"
-              links={getLinksForPlatform('github')}
-              onPress={() => openPlatform('github')}
-            />
-            <SocialLinkRow
-              platform="instagram"
-              links={getLinksForPlatform('instagram')}
-              onPress={() => openPlatform('instagram')}
-            />
-            <SocialLinkRow
-              platform="tiktok"
-              links={getLinksForPlatform('tiktok')}
-              onPress={() => openPlatform('tiktok')}
-            />
-            <SocialLinkRow
-              platform="website"
-              links={getLinksForPlatform('website')}
-              onPress={() => openPlatform('website')}
+            <SettingsItem
+              text="settings.daily_standup"
+              value={userStats?.standupTime || '09:00'}
+              onPress={() => standupTimeModal.present()}
             />
           </SettingsContainer>
+
+          <SocialSection
+            openPlatform={openPlatform}
+            getLinksForPlatform={getLinksForPlatform}
+          />
 
           <SettingsContainer title="settings.voice_model">
             <WhisperModelItem />
           </SettingsContainer>
 
-          <SettingsContainer title="settings.agent">
-            <MemoryItem />
-            <ProjectsItem />
-          </SettingsContainer>
+          <SectionAgent />
+          <SectionAbout appConfig={appConfig} />
 
-          <SettingsContainer title="settings.about">
-            <SettingsItem text="settings.app_name" value={Env.EXPO_PUBLIC_NAME} />
-            <SettingsItem text="settings.version" value={Env.EXPO_PUBLIC_VERSION} />
-          </SettingsContainer>
-
-          <SupportSection iconColor={iconColor} appConfig={appConfig} />
-          <LinksSection iconColor={iconColor} appConfig={appConfig} />
+          {__DEV__ && (
+            <SettingsContainer title="settings.developer">
+              <SettingsItem
+                text="settings.storage_manager"
+                icon={<Ionicons name="construct-outline" size={20} color={iconColor} />}
+                onPress={() => devModal.present()}
+              />
+            </SettingsContainer>
+          )}
 
           <View className="my-8">
             <SettingsContainer>
@@ -233,6 +272,12 @@ export function SettingsScreen() {
         links={selectedPlatform ? getLinksForPlatform(selectedPlatform) : []}
         onSave={handleSocialSave}
       />
+      <StandupTimeBottomSheet
+        ref={standupTimeModal.ref}
+        currentStandupTime={userStats?.standupTime || '09:00'}
+        onSave={time => setStandupTime({ time })}
+      />
+      <DevStorageBottomSheet modalRef={devModal.ref} />
     </>
   );
 }

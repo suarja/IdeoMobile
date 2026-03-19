@@ -11,6 +11,7 @@ import { translate } from '@/lib/i18n';
 
 import { storage } from '@/lib/storage';
 import { api } from '../../../convex/_generated/api';
+import { useUserStats } from '../focus/api';
 import { useActiveThread, useMessages } from './api';
 import { DailyStreakModal } from './components/daily-streak-modal';
 import { MicBottomBar } from './components/mic-bottom-bar';
@@ -20,7 +21,9 @@ import { QuestionMultiSelect } from './components/question-multi-select';
 import { QuestionSingleChoice } from './components/question-single-choice';
 import { SessionContinuationChips } from './components/session-continuation-chips';
 import { SessionEndCard } from './components/session-end-card';
+import { StandupSplash } from './components/standup-splash';
 import { TranscriptBox } from './components/transcript-box';
+import { useStandupTrigger } from './hooks/use-standup-trigger';
 import { useIdeaSession } from './use-idea-session';
 import { useVoiceRecording } from './use-voice-recording';
 
@@ -121,6 +124,7 @@ export function IdeaScreen() {
 
   const session = useIdeaSession();
   const activeThread = useActiveThread();
+  const userStats = useUserStats();
   // Read from custom messages table (createdAt: Date.now() — 100% reliable timestamp)
   const messages = useMessages(activeThread?.threadId ?? null);
   const recordAppOpen = useMutation(api.gamification.recordAppOpen);
@@ -137,6 +141,8 @@ export function IdeaScreen() {
   // Streak modal data
   const [streakData, setStreakData] = useState<{ currentStreak: number; activeDays: string[] } | null>(null);
   const [showStreakModal, setShowStreakModal] = useState(false);
+
+  const { showStandupSplash, setShowStandupSplash } = useStandupTrigger(userStats);
 
   // Award app-open points on mount
   useEffect(() => {
@@ -175,6 +181,14 @@ export function IdeaScreen() {
       setSessionEndDismissed(false);
     }
   }, [session.sessionEndData]);
+
+  // Hide standup splash if conditions are no longer met
+  useEffect(() => {
+    if (!userStats || userStats.hasDailyMood || !userStats.standupTime) {
+      if (showStandupSplash)
+        setShowStandupSplash(false);
+    }
+  }, [userStats?.standupTime, userStats?.hasDailyMood, userStats, showStandupSplash, setShowStandupSplash]);
 
   const recording = useVoiceRecording({
     whisperContext,
@@ -414,6 +428,12 @@ export function IdeaScreen() {
         currentStreak={streakData?.currentStreak ?? 0}
         activeDays={streakData?.activeDays ?? []}
         onClose={() => setShowStreakModal(false)}
+      />
+
+      {/* Standup Splash (Daily Ritual) */}
+      <StandupSplash
+        visible={showStandupSplash}
+        onDismiss={() => setShowStandupSplash(false)}
       />
     </KeyboardAvoidingView>
   );

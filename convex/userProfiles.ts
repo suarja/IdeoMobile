@@ -53,3 +53,30 @@ export const upsertUserProfile = mutation({
     }
   },
 });
+
+export const backfillUserProfilesAndStandupTime = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // 1. backfill userStats standupTime
+    const stats = await ctx.db.query('userStats').collect();
+    for (const stat of stats) {
+      if (!stat.standupTime) {
+        await ctx.db.patch(stat._id, { standupTime: '09:00' });
+      }
+
+      // 2. ensure userProfile exists
+      const existingProfile = await ctx.db
+        .query('userProfiles')
+        .withIndex('by_userId', q => q.eq('userId', stat.userId))
+        .first();
+
+      if (!existingProfile) {
+        await ctx.db.insert('userProfiles', {
+          userId: stat.userId,
+          socialLinks: [],
+          updatedAt: Date.now(),
+        });
+      }
+    }
+  },
+});

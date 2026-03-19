@@ -124,10 +124,15 @@ export const getUserStats = query({
       currentStreak: stats?.currentStreak ?? 0,
       longestStreak: stats?.longestStreak ?? 0,
       activeDays: stats?.activeDays ?? [],
+      standupTime: stats?.standupTime ?? '09:00',
       pointsToNextLevel,
       progressToNextLevel,
       nextLevelName: nextLevelData?.name ?? null,
       nextLevelIcon: nextLevelData?.iconEmoji ?? null,
+      hasDailyMood: !!(await ctx.db
+        .query('dailyMoods')
+        .withIndex('by_userId_date', q => q.eq('userId', userId).eq('date', utcDateString()))
+        .first()),
     };
   },
 });
@@ -187,6 +192,33 @@ export const getProjectGoals = query({
 // ---------------------------------------------------------------------------
 // Public mutations
 // ---------------------------------------------------------------------------
+
+export const saveDailyMood = mutation({
+  args: { moodScore: v.number(), date: v.string() },
+  handler: async (ctx, { moodScore, date }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      throw new Error('Unauthenticated');
+    const userId = identity.subject;
+
+    // Check if a mood for this date was already saved
+    const existing = await ctx.db
+      .query('dailyMoods')
+      .withIndex('by_userId_date', q => q.eq('userId', userId).eq('date', date))
+      .first();
+
+    if (!existing) {
+      await ctx.db.insert('dailyMoods', {
+        userId,
+        date,
+        moodScore,
+        createdAt: Date.now(),
+      });
+      // Grant a small point reward for the daily check-in
+      await grantPoints(ctx, userId, 10);
+    }
+  },
+});
 
 export const completeDailyChallenge = mutation({
   args: { challengeId: v.id('dailyChallenges') },
@@ -541,10 +573,23 @@ export const initNewUser = internalMutation({
         userId,
         totalPoints: 0,
         currentLevel: 1,
-        currentStreak: 0,
-        longestStreak: 0,
-        lastSessionAt: 0,
-        activeDays: [],
+        currentStreak: 1,
+        longestStreak: 1,
+        lastSessionAt: Date.now(),
+        activeDays: [Date.now().toString()],
+        standupTime: '09:00',
+      });
+    }
+
+    const existingProfile = await ctx.db
+      .query('userProfiles')
+      .withIndex('by_userId', q => q.eq('userId', userId))
+      .first();
+    if (!existingProfile) {
+      await ctx.db.insert('userProfiles', {
+        userId,
+        socialLinks: [],
+        updatedAt: Date.now(),
       });
     }
 
