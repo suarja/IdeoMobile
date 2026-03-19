@@ -11,12 +11,16 @@
 
 
 ### Code
+- La modale de rituel ne s'affiche pas?
+
 - Lorsque on télécharge un modèle de transcription, il y a une erreur levée par React, indiquant potentiellement une boucle infinie, mais qui ne bloque pas, ou en tout cas ne bloque pas de façon significative. C'est juste une alerte, peut-être pendant une phase du téléchargement du modèle.
 
 Le flot du modèle est aussi à vérifier, dans le sens où on prévient pas l'utilisateur que on demande pas à l'utilisateur de télécharger le modèle, et on prévient pas non plus au démarrage, la première fois. 
 
 
 ## Gamification
+### Afficher la barre de progression en mode banner chaque fois qu'on attribut des points
+
 ## tool to update radar ponderation and project score
 
 
@@ -98,3 +102,12 @@ Et là on lui propose par exemple une option : "Besoin d'aide, d'aide technique,
 ## Onboarding 
 ### Aha moement
 L'utilisateur aura donc un échange avec l'agent, et à l'issue de celui-là, ce qu'on peut faire, c'est voilà, avoir peut-être une espèce d'évaluation de l'idée et peut-être la création d'objectifs quotidiens que l'utilisateur pourra voir. En fait, en gros, on va lui créer la page focus sur mesure avec des challenges et la barre de progression, tout ça, et voilà, à la volée. 
+
+## Copy
+- La boussole du vibe codeur
+
+## Offre irresistible
+- si tu suis notre méthode et que tu ne fais pas d'argent avec ton projet, tu ne payes rien
+
+
+don: project manager
