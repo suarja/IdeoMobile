@@ -22,31 +22,24 @@ import { RadarChart } from './components/radar-chart';
 import { SparkBurst } from './components/spark-burst';
 import { useLevelUpDetection } from './hooks/use-level-up-detection';
 
-const DIMENSION_COLORS: Record<string, string> = {
-  validation: colors.success[500],
-  design: colors.primary[600],
-  development: colors.charcoal[700],
-  distribution: colors.warning[500],
-};
-
 function DimensionBadge({ dimension }: { dimension: string }) {
-  const bg = DIMENSION_COLORS[dimension] ?? colors.brand.muted;
   const label = dimension.charAt(0).toUpperCase() + dimension.slice(1);
   return (
     <View
       style={{
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
-        backgroundColor: bg,
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: `${colors.brand.border}60`,
+        backgroundColor: colors.brand.selected,
       }}
     >
-      <Text style={{ fontSize: 10, color: colors.white, fontWeight: '600' }}>{label}</Text>
+      <Text style={{ fontSize: 10, color: colors.brand.dark, fontWeight: '700' }}>{label}</Text>
     </View>
   );
 }
 
-// eslint-disable-next-line max-lines-per-function -- expanded stylistic layout increases line count
 function ChallengeRow({
   item,
   threadId,
@@ -57,55 +50,48 @@ function ChallengeRow({
   onComplete: (result: { approved: boolean; message: string }) => void;
 }) {
   const [validating, setValidating] = useState(false);
-  // Delay spinner so sparks play first (600ms)
-  const [showSpinner, setShowSpinner] = useState(false);
   const [sparkTrigger, setSparkTrigger] = useState(false);
   const validate = useValidateAndCompleteDailyChallenge();
 
   const handlePress = async () => {
     if (item.completed || validating)
       return;
-    // Fire-and-forget — never await haptics (may hang if native module not ready)
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setSparkTrigger(true);
     setTimeout(() => setSparkTrigger(false), 900);
     setValidating(true);
-    // Delay spinner so sparks play unobstructed
-    const spinnerTimer = setTimeout(() => setShowSpinner(true), 600);
     try {
       const result = await validate({ challengeId: item._id, threadId });
       onComplete(result ?? { approved: false, message: 'Validation failed.' });
     }
     finally {
-      clearTimeout(spinnerTimer);
       setValidating(false);
-      setShowSpinner(false);
     }
   };
 
   return (
     <View
-      className="mb-3 flex-row items-center rounded-2xl p-4"
+      className="mb-3 flex-row items-center p-3 px-4"
       style={{
-        backgroundColor: colors.brand.card,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: colors.brand.border,
+        backgroundColor: colors.white,
         shadowColor: colors.brand.dark,
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
+        shadowOpacity: 0.08,
         shadowRadius: 8,
         elevation: 2,
-        borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.03)',
       }}
     >
-      {/* Checkbox with overflow visible for spark burst */}
       <View style={{ overflow: 'visible', marginRight: 12 }}>
         <TouchableOpacity
           onPress={handlePress}
           disabled={validating || item.completed}
           style={{
-            width: 24,
-            height: 24,
-            borderRadius: 12,
+            width: 22,
+            height: 22,
+            borderRadius: 11,
             borderWidth: 1.5,
             borderColor: colors.brand.dark,
             backgroundColor: item.completed ? colors.brand.dark : 'transparent',
@@ -113,24 +99,24 @@ function ChallengeRow({
             justifyContent: 'center',
           }}
         >
-          {showSpinner
-            ? <ActivityIndicator size="small" color={colors.brand.dark} />
+          {validating
+            ? <ActivityIndicator size="small" color={colors.brand.dark} style={{ transform: [{ scale: 0.7 }] }} />
             : item.completed
-              ? <Text style={{ fontSize: 13, color: colors.white }}>✓</Text>
+              ? <Text style={{ fontSize: 12, color: colors.brand.bg }}>✓</Text>
               : null}
         </TouchableOpacity>
         <SparkBurst
           trigger={sparkTrigger}
           color={colors.primary[500]}
           count={8}
-          size={6}
-          radius={30}
+          size={5}
+          radius={24}
         />
       </View>
       <View className="flex-1">
         <Text
           style={{
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: '600',
             color: item.completed ? colors.brand.muted : colors.brand.dark,
             textDecorationLine: item.completed ? 'line-through' : 'none',
@@ -138,30 +124,22 @@ function ChallengeRow({
         >
           {item.label}
         </Text>
-        {item.dimension && (
+        {item.dimension && !item.completed && (
           <View className="mt-1 flex-row items-center">
             <DimensionBadge dimension={item.dimension} />
           </View>
         )}
       </View>
       <View
-        className="ml-3 rounded-full px-3 py-1"
+        className="ml-3 px-2.5 py-1"
         style={{
-          backgroundColor: colors.brand.card,
-          borderWidth: 1,
-          borderColor: 'rgba(0,0,0,0.05)',
-          shadowColor: colors.brand.dark,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 3,
-          elevation: 2,
+          backgroundColor: colors.brand.dark,
+          borderRadius: 12,
         }}
       >
-        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.brand.dark }}>
+        <Text style={{ fontSize: 11, fontWeight: '800', color: colors.brand.bg }}>
           +
           {item.points}
-          {' '}
-          pts
         </Text>
       </View>
     </View>
@@ -199,7 +177,7 @@ function DailyChallengesSection() {
           </View>
         )}
       </View>
-      {!challenges || challenges.length === 0
+      {(!challenges || challenges.length === 0)
         ? (
             <Text className="text-sm" style={{ color: colors.brand.muted }}>
               No challenges today — check back later.
@@ -229,7 +207,7 @@ function DailyChallengesSection() {
           <View
             style={{
               backgroundColor: colors.white,
-              borderRadius: 16,
+              borderRadius: 12,
               padding: 24,
               width: '100%',
             }}
@@ -253,25 +231,26 @@ function GoalRow({ item, onComplete }: { item: ProjectGoal; onComplete: () => vo
   const isAgent = item.createdBy.startsWith('agent') || item.createdBy === 'system';
   return (
     <View
-      className="mb-3 flex-row items-center rounded-2xl p-4"
+      className="mb-3 flex-row items-center p-3 px-4"
       style={{
-        backgroundColor: colors.brand.card,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: colors.brand.border,
+        backgroundColor: colors.white,
         shadowColor: colors.brand.dark,
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
+        shadowOpacity: 0.08,
         shadowRadius: 8,
         elevation: 2,
-        borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.03)',
       }}
     >
       <TouchableOpacity
         onPress={onComplete}
         style={{
           marginRight: 12,
-          width: 24,
-          height: 24,
-          borderRadius: 12,
+          width: 22,
+          height: 22,
+          borderRadius: 11,
           borderWidth: 1.5,
           borderColor: colors.brand.dark,
           backgroundColor: item.completed ? colors.brand.dark : 'transparent',
@@ -280,13 +259,13 @@ function GoalRow({ item, onComplete }: { item: ProjectGoal; onComplete: () => vo
         }}
       >
         {item.completed && (
-          <Text style={{ fontSize: 13, color: colors.white }}>✓</Text>
+          <Text style={{ fontSize: 12, color: colors.brand.bg }}>✓</Text>
         )}
       </TouchableOpacity>
       <View className="flex-1">
         <Text
           style={{
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: '600',
             color: item.completed ? colors.brand.muted : colors.brand.dark,
             textDecorationLine: item.completed ? 'line-through' : 'none',
@@ -294,31 +273,23 @@ function GoalRow({ item, onComplete }: { item: ProjectGoal; onComplete: () => vo
         >
           {item.title}
         </Text>
-        {item.dimension && (
+        {item.dimension && !item.completed && (
           <View className="mt-1 flex-row items-center">
             <DimensionBadge dimension={item.dimension} />
           </View>
         )}
       </View>
-      <Text style={{ fontSize: 18, marginRight: 8 }}>{isAgent ? '🤖' : '👤'}</Text>
+      <Text style={{ fontSize: 16, marginRight: 8 }}>{isAgent ? '🤖' : '👤'}</Text>
       <View
-        className="rounded-full px-3 py-1"
+        className="px-2.5 py-1"
         style={{
-          backgroundColor: colors.brand.card,
-          borderWidth: 1,
-          borderColor: 'rgba(0,0,0,0.05)',
-          shadowColor: colors.brand.dark,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 3,
-          elevation: 2,
+          backgroundColor: colors.brand.dark,
+          borderRadius: 12,
         }}
       >
-        <Text style={{ fontSize: 13, fontWeight: '800', color: colors.brand.dark }}>
+        <Text style={{ fontSize: 11, fontWeight: '800', color: colors.brand.bg }}>
           +
           {item.points}
-          {' '}
-          pts
         </Text>
       </View>
     </View>
