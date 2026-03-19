@@ -26,24 +26,24 @@ const EXPO_PUBLIC_APP_ENV = (process.env.EXPO_PUBLIC_APP_ENV
   ?? 'development') as z.infer<typeof envSchema>['EXPO_PUBLIC_APP_ENV'];
 
 const BUNDLE_IDS = {
-  development: 'com.ideomobile.development',
-  preview: 'com.ideomobile.preview',
-  production: 'com.ideomobile',
+  development: 'com.don.development',
+  preview: 'com.don.preview',
+  production: 'com.don',
 } as const;
 
 const PACKAGES = {
-  development: 'com.ideomobile.development',
-  preview: 'com.ideomobile.preview',
-  production: 'com.ideomobile',
+  development: 'com.don.development',
+  preview: 'com.don.preview',
+  production: 'com.don',
 } as const;
 
 const SCHEMES = {
-  development: 'IdeoMobile',
-  preview: 'IdeoMobile.preview',
-  production: 'IdeoMobile',
+  development: 'Don',
+  preview: 'Don.preview',
+  production: 'Don',
 } as const;
 
-const NAME = 'IdeoMobile';
+const NAME = 'Don';
 
 // Check if strict validation is required (before prebuild)
 const STRICT_ENV_VALIDATION = process.env.STRICT_ENV_VALIDATION === '1';

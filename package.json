@@ -1,5 +1,5 @@
 {
-  "name": "ideomobile",
+  "name": "don",
   "version": "0.0.1",
   "private": true,
   "packageManager": "pnpm@10.12.3",
@@ -45,7 +45,7 @@
     "test:ci": "pnpm run test --coverage",
     "test:watch": "pnpm run test --watch",
     "install-maestro": "curl -Ls 'https://get.maestro.mobile.dev' | bash",
-    "e2e-test": "maestro test .maestro/ -e APP_ID=com.obytes.development"
+    "e2e-test": "maestro test .maestro/ -e APP_ID=com.don.development"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "2.0.70",
