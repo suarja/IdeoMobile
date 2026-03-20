@@ -67,7 +67,9 @@ ${content}
 
 Instructions:
 1. Choose the best specialist for this message (default to "general" if unclear)
-2. If the message is > 800 tokens, compress it to preserve intent + key facts
+2. processedMessage rules — critical:
+   - If the message is ≤ 800 tokens: return it VERBATIM, unchanged, as processedMessage
+   - If the message is > 800 tokens: compress to a concise first-person statement that starts with "I" ("I want to...", "I'm looking to...", "I need help with...") — preserve intent + key facts
 3. Select 3-5 memory fragments most relevant for the chosen specialist
 4. Return ONLY valid JSON, no prose, no markdown:
 {"specialist":"<type>","processedMessage":"<message or compressed version>","selectedMemory":[{"key":"...","value":"..."}]}`;

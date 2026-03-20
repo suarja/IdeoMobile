@@ -51,10 +51,15 @@ insertMessage(threadId, 'assistant', responseText) ← table messages legacy
 - **Pattern :** `internalAction` — appelle `generateText` directement, **pas** `continueThread`
 - **Rôles :**
   1. Routing : choisit le spécialiste selon le message + scores radar faibles (< 30 boostés)
-  2. Compression : si message > ~800 tokens, résumé en conservant l'intention + faits clés
+  2. processedMessage : retourne le message **verbatim** si ≤ 800 tokens ; compresse en première personne ("I want to…") si > 800 tokens
   3. Sélection mémoire : parmi tous les fragments, choisit les 3-5 les plus pertinents pour l'agent cible
 - **Output JSON :** `{ specialist, processedMessage, selectedMemory }`
 - **Fallback :** sur toute erreur (parsing, API), retourne `general` avec le message original
+
+**Règle `processedMessage`** — critique pour l'affichage "Scope" dans l'UI :
+- Message court (≤ 800 tokens) → verbatim, jamais reformulé → l'utilisateur voit ses propres mots
+- Message long (> 800 tokens) → compression à la première personne ("I want to...", "I'm looking to...")
+- Ne jamais reformuler à la troisième personne ("User wants to…") — l'UI affiche directement ce champ
 
 ---
 
@@ -252,11 +257,52 @@ Agent génère texte + %%CLARIFY:{...}%%
     ↓
 useIdeaSession.clarification = parsé depuis rawAssistantText
     ↓
-IdeaScreen affiche QuestionSingleChoice / QuestionMultiSelect / QuestionConfirmCancel
-    ↓ user tape une option
+ClarificationBlock route vers QuestionSingleChoice / QuestionMultiSelect / QuestionConfirmCancel
+    ↓ user tape une option (QuestionSingleChoice : toggle + bouton "Valider" avant envoi)
 handleClarificationSelect(option) → handleSend(option)
     ↓ nouveau message user avec la sélection → nouveau cycle synthesizing
 ```
+
+---
+
+## Rendu markdown agent (`AgentMarkdown`)
+
+**Fichier :** `src/features/idea/components/agent-markdown.tsx`
+
+Le composant `AgentMarkdown` remplace un simple `<Text>` pour afficher les réponses des agents. Il parse le texte en blocs puis rend chaque type nativement.
+
+### Blocs supportés
+
+| Syntaxe | Rendu |
+|---------|-------|
+| `---` / `***` / `___` | `<View>` avec `borderBottomWidth: 1` |
+| `# Titre` / `## Titre` / `### Titre` | `<Text>` avec taille et graisse proportionnelles |
+| `\| col \| col \|` (table markdown) | `<View>` grid avec header grisé + alternance lignes |
+| Texte ordinaire | `InlineText` (bold + italic inline) |
+
+### Inline markdown (InlineText)
+
+`InlineText` est utilisé pour les paragraphes ET dans les cellules de tables. Supporte : `***bold italic***`, `**bold**`, `*italic*`, `_italic_`.
+
+### Masque streaming (`truncateAtMarkerPrefix`)
+
+Pendant le streaming, `stripClarifyMarker` appelle d'abord `truncateAtMarkerPrefix` qui coupe le texte dès que `%%CLARIFY:` ou `%%SESSION_END%%` apparaît (même partiellement). Résultat : les markers ne sont jamais visibles à l'écran, même en cours de génération.
+
+```typescript
+// use-idea-session.ts
+function truncateAtMarkerPrefix(text: string): string {
+  const indices = ['%%CLARIFY:', '%%SESSION_END%%']
+    .map(p => text.indexOf(p)).filter(i => i !== -1);
+  if (indices.length === 0) return text;
+  return text.slice(0, Math.min(...indices)).trimEnd();
+}
+```
+
+### Scroll automatique
+
+`IdeaScreen` utilise `useSmoothText` de `@convex-dev/agent/react` pour animer le streaming caractère par caractère. Deux `useEffect` gèrent le scroll :
+1. Pendant le streaming → `scrollToEnd({ animated: false })` à chaque caractère
+2. À la fin du streaming (transition `true → false`) → `scrollToEnd({ animated: true })` avec délai 100ms
 
 ---
 
