@@ -12,12 +12,19 @@ type Props = {
 
 export function QuestionSingleChoice({ question, options, onSelect, isDisabled }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
 
   const handlePress = (option: string) => {
-    if (isDisabled || selected)
+    if (isDisabled || confirmed)
       return;
-    setSelected(option);
-    onSelect(option);
+    setSelected(prev => prev === option ? null : option);
+  };
+
+  const handleConfirm = () => {
+    if (confirmed || selected === null)
+      return;
+    setConfirmed(true);
+    onSelect(selected);
   };
 
   return (
@@ -30,11 +37,11 @@ export function QuestionSingleChoice({ question, options, onSelect, isDisabled }
           style={[
             styles.card,
             selected === option && styles.cardSelected,
-            (isDisabled && selected !== option) && styles.cardDisabled,
+            (isDisabled || confirmed) && selected !== option && styles.cardDisabled,
           ]}
           onPress={() => handlePress(option)}
           activeOpacity={0.7}
-          disabled={!!isDisabled || !!selected}
+          disabled={!!isDisabled || confirmed}
         >
           <Text style={[styles.optionText, selected === option && styles.optionTextSelected]}>
             {option}
@@ -42,6 +49,16 @@ export function QuestionSingleChoice({ question, options, onSelect, isDisabled }
           <View style={[styles.radio, selected === option && styles.radioSelected]} />
         </TouchableOpacity>
       ))}
+      {selected !== null && !confirmed && (
+        <TouchableOpacity
+          style={[styles.confirmButton, isDisabled && styles.cardDisabled]}
+          onPress={handleConfirm}
+          activeOpacity={0.8}
+          disabled={isDisabled}
+        >
+          <Text style={styles.confirmText}>Valider</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -105,5 +122,18 @@ const styles = StyleSheet.create({
   radioSelected: {
     backgroundColor: '#C4773B',
     borderColor: '#C4773B',
+  },
+  confirmButton: {
+    alignItems: 'center',
+    backgroundColor: '#433831',
+    borderRadius: 14,
+    marginTop: 4,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+  },
+  confirmText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

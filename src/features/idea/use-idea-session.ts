@@ -42,6 +42,18 @@ type IdeaSession = {
 const CLARIFY_REGEX = /%%CLARIFY:(\{.*?\})%%/s;
 const SESSION_END_REGEX = /%%SESSION_END%%(\{.*\})/s;
 
+const CLARIFY_PREFIX = '%%CLARIFY:';
+const SESSION_END_PREFIX = '%%SESSION_END%%';
+
+function truncateAtMarkerPrefix(text: string): string {
+  const clarifyIdx = text.indexOf(CLARIFY_PREFIX);
+  const sessionEndIdx = text.indexOf(SESSION_END_PREFIX);
+  const indices = [clarifyIdx, sessionEndIdx].filter(i => i !== -1);
+  if (indices.length === 0)
+    return text;
+  return text.slice(0, Math.min(...indices)).trimEnd();
+}
+
 /** Parse the %%CLARIFY:{...}%% marker from agent text. Returns null if absent or invalid. */
 function parseClarificationFromText(text: string): Clarification | null {
   const match = CLARIFY_REGEX.exec(text);
@@ -68,9 +80,10 @@ function parseSessionEndFromText(text: string): SessionEndData | null {
   }
 }
 
-/** Strip both marker types from text for display. */
+/** Strip both marker types from text for display. Truncates at partial marker prefix during streaming. */
 export function stripClarifyMarker(text: string): string {
-  return text
+  const truncated = truncateAtMarkerPrefix(text);
+  return truncated
     .replace(CLARIFY_REGEX, '')
     .replace(SESSION_END_REGEX, '')
     .trimEnd();

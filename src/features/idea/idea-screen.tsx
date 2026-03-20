@@ -1,3 +1,4 @@
+import { useSmoothText } from '@convex-dev/agent/react';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from 'convex/react';
 import { useEffect, useRef, useState } from 'react';
@@ -249,10 +250,34 @@ export function IdeaScreen() {
       .catch(console.error);
   };
 
+  const [smoothedStreamingText] = useSmoothText(session.streamingText, {
+    startStreaming: session.isSynthesizing,
+  });
+
   // Text to display: prefer streaming text while synthesizing, fall back to completed assistant message
   const displayText = session.isSynthesizing
-    ? session.streamingText
+    ? smoothedStreamingText
     : (session.lastAssistantMessage?.content ?? '');
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const prevIsSynthesizingRef = useRef(false);
+
+  // Scroll during streaming to track visible text
+  useEffect(() => {
+    if (session.isSynthesizing) {
+      scrollViewRef.current?.scrollToEnd({ animated: false });
+    }
+  }, [smoothedStreamingText, session.isSynthesizing]);
+
+  // Scroll to bottom when streaming ends (transition true → false)
+  useEffect(() => {
+    if (prevIsSynthesizingRef.current && !session.isSynthesizing) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+    prevIsSynthesizingRef.current = session.isSynthesizing;
+  }, [session.isSynthesizing]);
 
   return (
     <KeyboardAvoidingView
@@ -282,6 +307,7 @@ export function IdeaScreen() {
 
       {/* Scrollable unified content block */}
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
