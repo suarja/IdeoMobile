@@ -9,7 +9,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import {
   createDownloadResumable,
 } from 'expo-file-system/legacy';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { initWhisper, initWhisperVad } from 'whisper.rn/index.js';
 import { storage } from '@/lib/storage';
 
@@ -101,6 +101,17 @@ export function useWhisperModels() {
   );
   const [vadContext, setVadContext] = useState<any>(null);
   const [currentModelId, setCurrentModelId] = useState<string | null>(null);
+
+  // Refs always pointing to the latest contexts — used for cleanup on unmount (Fast Refresh,
+  // app teardown) to release native Whisper objects and avoid TurboModuleManager timeout.
+  const whisperContextRef = useRef<WhisperContext | null>(null);
+  const vadContextRef = useRef<any>(null);
+  useEffect(() => {
+    whisperContextRef.current = whisperContext;
+  }, [whisperContext]);
+  useEffect(() => {
+    vadContextRef.current = vadContext;
+  }, [vadContext]);
 
   const getModelDirectory = useCallback(async () => {
     let documentDirectory: Directory;
@@ -260,10 +271,11 @@ export function useWhisperModels() {
         console.log(`Whisper context initialized for model: ${model.label}`);
 
         // Optionally initialize VAD context
+        let vad: any = null;
         if (options?.initVad) {
           console.log('Initializing VAD context...');
           try {
-            const vad = await initWhisperVad({
+            vad = await initWhisperVad({
               filePath: modelPath,
             });
             setVadContext(vad);
@@ -277,7 +289,7 @@ export function useWhisperModels() {
 
         return {
           whisperContext: context,
-          vadContext: options?.initVad ? vadContext : null,
+          vadContext: options?.initVad ? vad : null,
         };
       }
       catch (error) {
@@ -288,7 +300,7 @@ export function useWhisperModels() {
         setIsInitializingModel(false);
       }
     },
-    [downloadModel, vadContext],
+    [downloadModel],
   );
 
   const resetWhisperContext = useCallback(() => {
@@ -297,6 +309,18 @@ export function useWhisperModels() {
     setCurrentModelId(null);
     storage.delete(SELECTED_MODEL_KEY);
     console.log('Whisper contexts reset');
+  }, []);
+
+  /**
+   * Clears in-memory context state without deleting the saved model preference.
+   * Use when the native context is stuck (e.g. stop() timed out) — preserves the
+   * storage key so the model auto-reinits on next app mount. The user can re-select
+   * the same model from the bottom sheet to get a fresh native context immediately.
+   */
+  const softResetWhisperContext = useCallback(() => {
+    setWhisperContext(null);
+    setVadContext(null);
+    console.log('Whisper context soft-reset (model preference preserved)');
   }, []);
 
   const getModelById = useCallback((modelId: string) => {
@@ -373,6 +397,16 @@ export function useWhisperModels() {
     },
     [currentModelId, modelFiles, whisperContext],
   );
+
+  // Release native Whisper contexts on unmount (Fast Refresh, app teardown).
+  // Without this, the native C++ context outlives the JS side and causes:
+  //   TurboModuleManager: Timed out waiting for modules to be invalidated
+  useEffect(() => {
+    return () => {
+      whisperContextRef.current?.release?.().catch(() => {});
+      vadContextRef.current?.release?.().catch(() => {});
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -457,6 +491,7 @@ export function useWhisperModels() {
     downloadModel,
     initializeWhisperModel,
     resetWhisperContext,
+    softResetWhisperContext,
     deleteModel,
 
     // Helpers

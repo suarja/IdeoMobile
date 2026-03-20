@@ -1,17 +1,32 @@
+## Subject 
+Alors, les sujets à traiter sont :
+- le mécanisme des différentes modales, par exemple celle du Daily Stand Up, qui, pour l'instant, n'est que celle des émotions, de la météo des émotions et du Daily Streak
+- la bottom sheet modale
+- il faut voir comment les fusionner dans une page
+- il faut voir toujours sur ce sujet un peu d'interface de gamification rituelle
+- l'affichage des points attribués, qui soit qu'il y a un détecteur, une liste sonore, que dès qu'il y a des points qui sont attribués, soit directement affiché
+Donc, il y a peut-être la banner avec la barre de progression qui arrive et qui disparait lorsqu'on n'est pas sur l'écran focus.
+Il faudrait que, d'une façon ou d'une autre, on affiche, quand l'agent, ou que l'agent lui-même, le dise, quand il attribue des points et pourquoi. Parce que, là, sinon on sait pas trop pourquoi nous sortons les points.
+Pour vérifier l'attribution des points, comment ça se passe?
+Par rapport aux défis quotidiens, il faudrait voir :
+- la logique de création de ces défis par l'agent
+- la complétion, quand il arrive à échéance, peut-être pendant le cron job où ils sont créés
+- comment ils sont effacés
+Par rapport à l'agent, aussi, qu'il puisse s'exprimer quand il crée des challenges, si il crée des challenges, faut qu'il le dise et qu'il communique justement avec l'utilisateur. Par rapport à ça, il faudrait qu'il puisse mener peut-être l'entretien vers... Je vois, on verra, on verra pour ça.
+Alors il faut aussi ajouter l'usage tracking et les réglages par défaut aux agents avec le embedding model. Créer la table usage et se préparer à intégrer Revenu 4, une librairie pour la gestion des paiements. Et peut-être potentiellement aussi, post-hoc, pour les analytics. 
+
+Il faut aussi revoir l'écran focus pour intégrer :
+- changer le diagramme en araignée en bar chart, donc en diagramme au bâton
+- l'affichage des weights et du score
+- les différentes dimensions, donc sous forme de table, pour switcher entre les challenges et disons l'avancement
+
 ## Bugs
 
 ### UI
 
-- Dans le composant, donc les gens forment component. Il faudrait pouvoir avoir un bouton pour valider le choix, parce que là actuellement des comptes cliquent sur l'une des options. Il n'y a pas de possibilité de changer d'avis et ensuite de valider, par exemple. Il faudrait ajouter un bouton valider et que le bouton, donc la check box, passe soit sélectionnée. Qu'on passe le composant d'état à l'état sélectionné. 
-
-- Lors du streaming de la réponse de l'agent, il y a un scroll to the bottom jusqu'à la fin du message, où le scroll to bottom s'arrête. Potentiellement, si le message est très long, on ne voit pas la fin du message, puisqu'on n'est pas scrolled to the bottom. On est resté à un moment, comment dire? La fin du message arrive et du coup on perd le scroll to bottom. Voilà, donc il faudrait à la fin du message scroll to the bottom. 
-
-- Lorsque l'agent renvoie un message de clarification dans le streaming, avant que ce soit rendérisé en Agent Form Component, on voit le format utilisé par l'agent. 
-
-
 
 ### Code
-- La modale de rituel ne s'affiche pas?
+
 
 - Lorsque on télécharge un modèle de transcription, il y a une erreur levée par React, indiquant potentiellement une boucle infinie, mais qui ne bloque pas, ou en tout cas ne bloque pas de façon significative. C'est juste une alerte, peut-être pendant une phase du téléchargement du modèle.
 
@@ -20,6 +35,11 @@ Le flot du modèle est aussi à vérifier, dans le sens où on prévient pas l'u
 
 ## Gamification
 ### Afficher la barre de progression en mode banner chaque fois qu'on attribut des points
+
+- unifier daily standup, météo emotions, daily streak 
+- afficher la modale banner progress bar à chaque fois que des points sont attribués
+- L'agent dit les points qui ont été attribués 
+
 
 ## tool to update radar ponderation and project score
 
@@ -42,14 +62,24 @@ Shared SYSTEM_CHALLENGE_POOL, pickRandom, and
 
 - Il faudrait implémenter le paramètre d'ajustement de l'heure du rituel du Daily Stand-Up. 
 
+- usage tracking and sharing defaults 
+https://docs.convex.dev/agents/agent-usage#customizing-the-agent
+https://docs.convex.dev/agents/usage-tracking
+
+
+
 
 #### Chat interface
 
 - Ajouter guard agent (router)
 
 
-
 ### Handle voice session logic (standup)
+
+## Memory
+
+- update the memory entry to be user friendly
+- adding emmbedding
 
 
 ##### Flow rituel vs Commit
@@ -87,6 +117,10 @@ Et là on lui propose par exemple une option : "Besoin d'aide, d'aide technique,
 ### Tools 
 
 #### Web Search
+- Search tool usage
+- agents is not taking enough time to understand the project before doing the research 
+
+
 - [x] Tavily (default, TAVILY_API_KEY)
 - [x] Perplexity (PERPLEXITY_API_KEY)
 - [x] Anthropic native (webSearch_20250305, no extra key)

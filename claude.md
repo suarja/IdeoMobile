@@ -166,3 +166,12 @@ and derive `userId` from `ctx.auth.getUserIdentity()` on the Convex side (never 
 ### Sub-components
 - `TranscriptBox` — handles all three transcript states (listening / stopping / preview) with its own styles.
 - `MicBottomBar` — status text + FAB, purely presentational, no internal state.
+- `AgentMarkdown` (`components/agent-markdown.tsx`) — block-level markdown renderer for agent responses. Parses `---` (hr), `# headings`, `| tables |`, and inline bold/italic. Table cells also parse inline markdown. Use this for any AI text output.
+- `InlineSynthesizing` (`components/inline-synthesizing.tsx`) — animated spinner shown while `isSynthesizing` is true.
+- `ClarificationBlock` (`components/clarification-block.tsx`) — routes `single_choice` / `multi_select` / `confirm_cancel` to the correct question component.
+
+### Scope block
+The "SCOPE" label above the advisor response shows `processedMessage` from the Haiku router (verbatim user message for short inputs, first-person compression for long inputs). It is visible **during streaming** — not hidden behind `!isSynthesizing`. The text comes from the Convex agent thread (not the custom `messages` table).
+
+### Streaming mask
+`stripClarifyMarker` in `use-idea-session.ts` calls `truncateAtMarkerPrefix` first, which cuts any text at the first occurrence of `%%CLARIFY:` or `%%SESSION_END%%` (even partial prefixes). This prevents markers from leaking into the displayed text during streaming.

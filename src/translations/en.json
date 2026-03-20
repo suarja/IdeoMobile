@@ -75,7 +75,11 @@
     "user_memory_section": "Profile",
     "version": "Version",
     "voice_model": "Voice Model",
-    "website": "Website"
+    "website": "Website",
+    "whisper_onboarding_body1": "Ideo uses open source models that run directly on your device — no audio data is sent anywhere, and it's completely free.",
+    "whisper_onboarding_body2": "The base model is a great starting point. More accurate models are available in settings.",
+    "whisper_onboarding_cta": "Choose my model",
+    "whisper_onboarding_title": "Local Transcription"
   },
   "synthesizing": {
     "clarification_label": "CLARIFICATION",

@@ -7,9 +7,14 @@
     "title": "التركيز"
   },
   "idea": {
+    "continuation_prompt": "Pick up where we left off?",
     "cta": "تحدث عن فكرتك",
     "empty_hint": "لا توجد فكرة بعد.",
     "empty_hint2": "انقر على الميكروفون للبدء.",
+    "session_end_next_steps": "Prochaines étapes",
+    "session_end_objectives": "Objectifs",
+    "session_end_summary": "Résumé",
+    "session_end_title": "Session terminée",
     "subtitle": "اضغط وصف ما تريد بناءه",
     "title_placeholder": "فكرة جديدة…"
   },
@@ -30,6 +35,10 @@
     "agent_projects": "المشاريع",
     "app_name": "اسم التطبيق",
     "arabic": "عربي",
+    "daily_standup": "Daily Standup",
+    "daily_standup_time": "Standup Time",
+    "daily_standup_time_desc": "Configure your preferred daily standup time.",
+    "developer": "Developer",
     "english": "إنجليزي",
     "generale": "عام",
     "github": "جيثب",
@@ -52,6 +61,7 @@
     "social_save": "حفظ",
     "social_tiktok": "تيك توك",
     "social_website": "الموقع الإلكتروني",
+    "storage_manager": "Storage Manager",
     "support": "الدعم",
     "support_us": "ادعمنا",
     "terms": "شروط الخدمة",
@@ -65,7 +75,11 @@
     "user_memory_section": "الملف الشخصي",
     "version": "إصدار",
     "voice_model": "نموذج الصوت",
-    "website": "موقع الكتروني"
+    "website": "موقع الكتروني",
+    "whisper_onboarding_body1": "يستخدم Ideo نماذج مفتوحة المصدر تعمل مباشرةً على جهازك — لا يُرسل أي صوت إلى الإنترنت، وهو مجاني تمامًا.",
+    "whisper_onboarding_body2": "النموذج الأساسي كافٍ للبدء. نماذج أكثر دقة متاحة في الإعدادات.",
+    "whisper_onboarding_cta": "اختر نموذجي",
+    "whisper_onboarding_title": "النسخ المحلي"
   },
   "synthesizing": {
     "clarification_label": "توضيح",

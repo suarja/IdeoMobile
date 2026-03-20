@@ -1,11 +1,14 @@
 import { useSmoothText } from '@convex-dev/agent/react';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from 'convex/react';
-import { useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, FocusAwareStatusBar, Text, View } from '@/components/ui';
+import { useModal } from '@/components/ui/modal';
 
 import { useWhisperModels } from '@/lib/hooks/use-whisper-models';
 import { translate } from '@/lib/i18n';
@@ -13,6 +16,7 @@ import { storage } from '@/lib/storage';
 
 import { api } from '../../../convex/_generated/api';
 import { useUserStats } from '../focus/api';
+import { WhisperModelBottomSheet } from '../settings/components/whisper-model-bottom-sheet';
 import { useActiveThread, useMessages } from './api';
 import { AgentMarkdown } from './components/agent-markdown';
 import { ClarificationBlock } from './components/clarification-block';
@@ -24,6 +28,7 @@ import { SessionContinuationChips } from './components/session-continuation-chip
 import { SessionEndCard } from './components/session-end-card';
 import { StandupSplash } from './components/standup-splash';
 import { TranscriptBox } from './components/transcript-box';
+import { WhisperOnboardingModal } from './components/whisper-onboarding-modal';
 import { useStandupTrigger } from './hooks/use-standup-trigger';
 import { useIdeaSession } from './use-idea-session';
 import { useVoiceRecording } from './use-voice-recording';
@@ -33,12 +38,47 @@ const THREE_HOURS_MS = 3 * ONE_HOUR_MS;
 
 // eslint-disable-next-line max-lines-per-function
 export function IdeaScreen() {
-  const { whisperContext, isInitializingModel, isDownloading, currentModelId, initializeWhisperModel, getDownloadProgress }
-    = useWhisperModels();
+  const {
+    whisperContext,
+    isInitializingModel,
+    isDownloading,
+    currentModelId,
+    initializeWhisperModel,
+    softResetWhisperContext,
+    getDownloadProgress,
+    modelFiles,
+    deleteModel,
+    isModelDownloaded,
+    availableModels,
+  } = useWhisperModels();
 
+  // Refs so the useFocusEffect callback stays stable (empty deps).
+  // Without this, changing deps (currentModelId, isInitializingModel) would re-create the
+  // callback while the screen is focused, re-triggering the effect on every state change.
+  const currentModelIdRef = useRef(currentModelId);
+  const isInitializingModelRef = useRef(isInitializingModel);
+  const initializeWhisperModelRef = useRef(initializeWhisperModel);
   useEffect(() => {
-    initializeWhisperModel('base').catch(console.error);
+    currentModelIdRef.current = currentModelId;
+  }, [currentModelId]);
+  useEffect(() => {
+    isInitializingModelRef.current = isInitializingModel;
+  }, [isInitializingModel]);
+  useEffect(() => {
+    initializeWhisperModelRef.current = initializeWhisperModel;
   }, [initializeWhisperModel]);
+
+  // Sync model from storage whenever this screen gains focus.
+  // Needed because WhisperModelItem (settings) has its own useWhisperModels() instance
+  // that writes to storage but doesn't share React state with this screen.
+  useFocusEffect(
+    useCallback(() => {
+      const saved = storage.getString('whisper_selected_model');
+      if (saved && saved !== currentModelIdRef.current && !isInitializingModelRef.current) {
+        initializeWhisperModelRef.current(saved).catch(console.error);
+      }
+    }, []), // intentionally empty — state accessed via refs above
+  );
 
   const session = useIdeaSession();
   const activeThread = useActiveThread();
@@ -52,6 +92,12 @@ export function IdeaScreen() {
   const [sessionEndRequested, setSessionEndRequested] = useState(false);
   const [streakData, setStreakData] = useState<{ currentStreak: number; activeDays: string[] } | null>(null);
   const [showStreakModal, setShowStreakModal] = useState(false);
+
+  // Whisper onboarding: show once if no model has ever been selected
+  const hasSeenOnboarding = storage.getString('whisper_onboarding_seen') === '1';
+  const hasSavedModel = !!storage.getString('whisper_selected_model');
+  const [showOnboarding, setShowOnboarding] = useState(!hasSeenOnboarding && !hasSavedModel);
+  const whisperModal = useModal();
 
   const { showStandupSplash, setShowStandupSplash } = useStandupTrigger(userStats);
 
@@ -92,7 +138,22 @@ export function IdeaScreen() {
     }
   }, [userStats?.standupTime, userStats?.hasDailyMood, userStats, showStandupSplash, setShowStandupSplash]);
 
-  const recording = useVoiceRecording({ whisperContext, onRecordingComplete: session.enterPreview });
+  // stop() timed out → context was released inside useVoiceRecording.
+  // Soft-reset clears the React state, then immediately re-init the same model so the
+  // user can record again without navigating away. Ref prevents stale closure.
+  const handleStopTimeout = useCallback(() => {
+    softResetWhisperContext();
+    const saved = currentModelIdRef.current;
+    if (saved) {
+      initializeWhisperModelRef.current(saved).catch(console.error);
+    }
+  }, [softResetWhisperContext]);
+
+  const recording = useVoiceRecording({
+    whisperContext,
+    onRecordingComplete: session.enterPreview,
+    onStopTimeout: handleStopTimeout,
+  });
   const insets = useSafeAreaInsets();
 
   // ---------------------------------------------------------------------------
@@ -139,6 +200,14 @@ export function IdeaScreen() {
     setSessionEndRequested(true);
     session.handleSend('[SYSTEM: User requested session end. Please call endSession() with a summary of this session.]')
       .catch(console.error);
+  };
+
+  const handleMicPress = async () => {
+    if (!whisperContext && !isDownloading && !isInitializingModel) {
+      whisperModal.present();
+      return;
+    }
+    await recording.toggleListening();
   };
 
   // ---------------------------------------------------------------------------
@@ -278,19 +347,23 @@ export function IdeaScreen() {
 
       <MicBottomBar
         statusText={
-          isDownloading
-            ? `Downloading model… ${Math.round(getDownloadProgress(currentModelId ?? 'base') * 100)}%`
-            : isInitializingModel
-              ? 'Initializing model…'
-              : recording.isListening
-                ? 'Listening…'
-                : ''
+          !whisperContext && !isDownloading && !isInitializingModel
+            ? 'Choisir un modèle vocal →'
+            : isDownloading
+              ? `Downloading… ${Math.round(getDownloadProgress(currentModelId ?? '') * 100)}%`
+              : isInitializingModel
+                ? 'Initializing…'
+                : recording.isStopping
+                  ? 'Processing audio…'
+                  : recording.isListening
+                    ? 'Listening…'
+                    : ''
         }
         isListening={recording.isListening}
         isActive={recording.isListening || session.isSynthesizing}
         isDisabled={isBusy || session.isSynthesizing || recording.isStopping}
         showSpinner={isBusy || session.isSynthesizing || recording.isStopping}
-        onPress={async () => { await recording.toggleListening(); }}
+        onPress={handleMicPress}
         inputText={inputText}
         onInputChange={(text) => {
           setInputText(text);
@@ -298,6 +371,28 @@ export function IdeaScreen() {
             recording.clearTranscript();
         }}
         onSend={handleSend}
+      />
+
+      <WhisperOnboardingModal
+        visible={showOnboarding}
+        onContinue={() => {
+          storage.set('whisper_onboarding_seen', '1');
+          setShowOnboarding(false);
+          whisperModal.present();
+        }}
+      />
+
+      <WhisperModelBottomSheet
+        modalRef={whisperModal.ref}
+        modelFiles={modelFiles}
+        isDownloading={isDownloading}
+        isInitializingModel={isInitializingModel}
+        currentModelId={currentModelId}
+        initializeWhisperModel={initializeWhisperModel}
+        deleteModel={deleteModel}
+        isModelDownloaded={isModelDownloaded}
+        getDownloadProgress={getDownloadProgress}
+        availableModels={availableModels}
       />
 
       <DailyStreakModal
