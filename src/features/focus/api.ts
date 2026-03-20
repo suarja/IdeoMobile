@@ -75,6 +75,8 @@ export type DailyChallenge = {
   points: number;
   completed: boolean;
   dimension?: string;
+  lastValidationAttemptAt?: number;
+  lastRejectionMessage?: string;
 };
 
 export type ProjectGoal = {

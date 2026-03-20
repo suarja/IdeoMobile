@@ -1,8 +1,8 @@
 import type { DailyChallenge, ProjectGoal } from './api';
 
 import * as Haptics from 'expo-haptics';
-import { useState } from 'react';
-import { ActivityIndicator, Modal, TouchableOpacity } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Modal, StyleSheet, TouchableOpacity } from 'react-native';
 
 import { colors, FocusAwareStatusBar, ScrollView, Text, View } from '@/components/ui';
 import { DailyStreakModal } from '../idea/components/daily-streak-modal';
@@ -40,6 +40,75 @@ function DimensionBadge({ dimension }: { dimension: string }) {
   );
 }
 
+const CHALLENGE_COOLDOWN_MS = 30 * 60 * 1000;
+
+function getCooldownProgress(lastValidationAttemptAt?: number): number {
+  if (!lastValidationAttemptAt)
+    return 0;
+  const elapsed = Date.now() - lastValidationAttemptAt;
+  return Math.max(0, 1 - elapsed / CHALLENGE_COOLDOWN_MS);
+}
+
+function getMinutesRemaining(lastValidationAttemptAt?: number): number {
+  if (!lastValidationAttemptAt)
+    return 0;
+  const remaining = lastValidationAttemptAt + CHALLENGE_COOLDOWN_MS - Date.now();
+  return Math.max(0, Math.ceil(remaining / 60000));
+}
+
+function CooldownBar({ progress, minutesRemaining }: { progress: number; minutesRemaining: number }) {
+  return (
+    <View style={styles.cooldownContainer}>
+      <View style={styles.cooldownTrack}>
+        <View style={[styles.cooldownFill, { width: `${progress * 100}%` }]} />
+      </View>
+      <Text style={styles.cooldownText}>
+        Dans
+        {' '}
+        {minutesRemaining}
+        {' '}
+        min tu pourras réessayer
+      </Text>
+    </View>
+  );
+}
+
+function CooldownModal({
+  visible,
+  rejectionMessage,
+  minutesRemaining,
+  onDismiss,
+}: {
+  visible: boolean;
+  rejectionMessage: string;
+  minutesRemaining: number;
+  onDismiss: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Pas encore !</Text>
+          <Text style={styles.modalBody}>{rejectionMessage}</Text>
+          <Text style={styles.modalTimer}>
+            Dans
+            {' '}
+            {minutesRemaining}
+            {' '}
+            minute
+            {minutesRemaining > 1 ? 's' : ''}
+            {' '}
+            tu pourras réessayer.
+          </Text>
+          <TouchableOpacity onPress={onDismiss}>
+            <Text style={styles.modalDismiss}>OK</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function ChallengeRow({
   item,
   threadId,
@@ -47,15 +116,35 @@ function ChallengeRow({
 }: {
   item: DailyChallenge;
   threadId: string;
-  onComplete: (result: { approved: boolean; message: string }) => void;
+  onComplete: (result: { approved: boolean; message: string; cooldownUntil?: number }) => void;
 }) {
   const [validating, setValidating] = useState(false);
   const [sparkTrigger, setSparkTrigger] = useState(false);
+  const [showCooldownModal, setShowCooldownModal] = useState(false);
+  const [, setTick] = useState(0);
   const validate = useValidateAndCompleteDailyChallenge();
+
+  const isInCooldown = !item.completed
+    && !!item.lastValidationAttemptAt
+    && Date.now() - item.lastValidationAttemptAt < CHALLENGE_COOLDOWN_MS;
+
+  const cooldownProgress = getCooldownProgress(item.lastValidationAttemptAt);
+  const minutesRemaining = getMinutesRemaining(item.lastValidationAttemptAt);
+
+  useEffect(() => {
+    if (!isInCooldown)
+      return;
+    const interval = setInterval(() => setTick(t => t + 1), 10_000);
+    return () => clearInterval(interval);
+  }, [isInCooldown]);
 
   const handlePress = async () => {
     if (item.completed || validating)
       return;
+    if (isInCooldown) {
+      setShowCooldownModal(true);
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setSparkTrigger(true);
     setTimeout(() => setSparkTrigger(false), 900);
@@ -70,79 +159,54 @@ function ChallengeRow({
   };
 
   return (
-    <View
-      className="mb-3 flex-row items-center p-3 px-4"
-      style={{
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: colors.brand.border,
-        backgroundColor: colors.white,
-        shadowColor: colors.brand.dark,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 2,
-      }}
-    >
-      <View style={{ overflow: 'visible', marginRight: 12 }}>
-        <TouchableOpacity
-          onPress={handlePress}
-          disabled={validating || item.completed}
-          style={{
-            width: 22,
-            height: 22,
-            borderRadius: 11,
-            borderWidth: 1.5,
-            borderColor: colors.brand.dark,
-            backgroundColor: item.completed ? colors.brand.dark : 'transparent',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {validating
-            ? <ActivityIndicator size="small" color={colors.brand.dark} style={{ transform: [{ scale: 0.7 }] }} />
-            : item.completed
-              ? <Text style={{ fontSize: 12, color: colors.brand.bg }}>✓</Text>
-              : null}
-        </TouchableOpacity>
-        <SparkBurst
-          trigger={sparkTrigger}
-          color={colors.primary[500]}
-          count={8}
-          size={5}
-          radius={24}
-        />
-      </View>
-      <View className="flex-1">
-        <Text
-          style={{
-            fontSize: 14,
-            fontWeight: '600',
-            color: item.completed ? colors.brand.muted : colors.brand.dark,
-            textDecorationLine: item.completed ? 'line-through' : 'none',
-          }}
-        >
-          {item.label}
-        </Text>
-        {item.dimension && !item.completed && (
-          <View className="mt-1 flex-row items-center">
-            <DimensionBadge dimension={item.dimension} />
+    <>
+      <View className="p-3 px-4" style={styles.challengeCard}>
+        <View className="flex-row items-center">
+          <View style={styles.checkboxWrapper}>
+            <TouchableOpacity
+              onPress={handlePress}
+              disabled={validating || item.completed}
+              style={[styles.checkbox, { backgroundColor: item.completed ? colors.brand.dark : 'transparent' }]}
+            >
+              {validating
+                ? <ActivityIndicator size="small" color={colors.brand.dark} style={styles.spinner} />
+                : item.completed
+                  ? <Text style={{ fontSize: 12, color: colors.brand.bg }}>✓</Text>
+                  : null}
+            </TouchableOpacity>
+            <SparkBurst trigger={sparkTrigger} color={colors.primary[500]} count={8} size={5} radius={24} />
           </View>
-        )}
+          <View className="flex-1">
+            <Text
+              style={[
+                styles.challengeLabel,
+                { color: item.completed ? colors.brand.muted : colors.brand.dark, textDecorationLine: item.completed ? 'line-through' : 'none' },
+              ]}
+            >
+              {item.label}
+            </Text>
+            {item.dimension && !item.completed && (
+              <View className="mt-1 flex-row items-center">
+                <DimensionBadge dimension={item.dimension} />
+              </View>
+            )}
+          </View>
+          <View className="ml-3 px-2.5 py-1" style={styles.pointsBadge}>
+            <Text style={styles.pointsText}>
+              +
+              {item.points}
+            </Text>
+          </View>
+        </View>
+        {isInCooldown && <CooldownBar progress={cooldownProgress} minutesRemaining={minutesRemaining} />}
       </View>
-      <View
-        className="ml-3 px-2.5 py-1"
-        style={{
-          backgroundColor: colors.brand.dark,
-          borderRadius: 12,
-        }}
-      >
-        <Text style={{ fontSize: 11, fontWeight: '800', color: colors.brand.bg }}>
-          +
-          {item.points}
-        </Text>
-      </View>
-    </View>
+      <CooldownModal
+        visible={showCooldownModal}
+        rejectionMessage={item.lastRejectionMessage ?? 'Continue à travailler sur ce défi.'}
+        minutesRemaining={minutesRemaining}
+        onDismiss={() => setShowCooldownModal(false)}
+      />
+    </>
   );
 }
 
@@ -189,7 +253,7 @@ function DailyChallengesSection() {
               item={item}
               threadId={threadId ?? ''}
               onComplete={(result) => {
-                if (!result.approved)
+                if (!result.approved && !result.cooldownUntil)
                   setRejectionMessage(result.message);
               }}
             />
@@ -364,3 +428,104 @@ export function FocusScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  challengeCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.brand.border,
+    backgroundColor: colors.white,
+    shadowColor: colors.brand.dark,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: 12,
+  },
+  checkboxWrapper: {
+    overflow: 'visible',
+    marginRight: 12,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: colors.brand.dark,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  spinner: {
+    transform: [{ scale: 0.7 }],
+  },
+  challengeLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pointsBadge: {
+    backgroundColor: colors.brand.dark,
+    borderRadius: 12,
+  },
+  pointsText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.brand.bg,
+  },
+  cooldownContainer: {
+    marginTop: 8,
+    gap: 4,
+  },
+  cooldownTrack: {
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.neutral[200],
+    overflow: 'hidden',
+  },
+  cooldownFill: {
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.primary[400],
+  },
+  cooldownText: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    color: colors.neutral[500],
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    padding: 24,
+    width: '100%',
+    gap: 8,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.brand.dark,
+    marginBottom: 4,
+  },
+  modalBody: {
+    fontSize: 14,
+    color: colors.brand.dark,
+    lineHeight: 20,
+  },
+  modalTimer: {
+    fontSize: 13,
+    color: colors.brand.muted,
+    fontStyle: 'italic',
+  },
+  modalDismiss: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.brand.dark,
+    textAlign: 'right',
+    marginTop: 8,
+  },
+});

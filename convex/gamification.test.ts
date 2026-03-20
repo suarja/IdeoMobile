@@ -304,3 +304,87 @@ describe('getProjectGoals', () => {
     expect(goals[0].title).toBe('Goal A');
   });
 });
+
+// ── Rate-limit (updateValidationAttempt) ──────────────────────────────────────
+
+describe('updateValidationAttempt', () => {
+  it('stocke lastValidationAttemptAt et lastRejectionMessage', async () => {
+    const t = makeT();
+
+    const challengeId = await t.run(async (ctx) => {
+      return ctx.db.insert('dailyChallenges', {
+        userId: 'user_1',
+        date: '2026-03-20',
+        challengeType: 'voice_session',
+        label: 'Voice session',
+        points: 50,
+        completed: false,
+      });
+    });
+
+    const now = Date.now();
+    await t.mutation(internal.gamification.updateValidationAttempt, {
+      challengeId,
+      lastValidationAttemptAt: now,
+      lastRejectionMessage: 'Continue à travailler !',
+    });
+
+    const challenge = await t.run(async ctx => ctx.db.get(challengeId));
+    expect(challenge!.lastValidationAttemptAt).toBe(now);
+    expect(challenge!.lastRejectionMessage).toBe('Continue à travailler !');
+  });
+
+  it('écrase la valeur précédente lors d\'une nouvelle tentative', async () => {
+    const t = makeT();
+
+    const earlier = Date.now() - 35 * 60 * 1000; // 35 min ago (hors cooldown)
+    const challengeId = await t.run(async (ctx) => {
+      return ctx.db.insert('dailyChallenges', {
+        userId: 'user_1',
+        date: '2026-03-20',
+        challengeType: 'voice_session',
+        label: 'Voice session',
+        points: 50,
+        completed: false,
+        lastValidationAttemptAt: earlier,
+        lastRejectionMessage: 'Ancien message.',
+      });
+    });
+
+    const now = Date.now();
+    await t.mutation(internal.gamification.updateValidationAttempt, {
+      challengeId,
+      lastValidationAttemptAt: now,
+      lastRejectionMessage: 'Nouveau message.',
+    });
+
+    const challenge = await t.run(async ctx => ctx.db.get(challengeId));
+    expect(challenge!.lastValidationAttemptAt).toBe(now);
+    expect(challenge!.lastRejectionMessage).toBe('Nouveau message.');
+  });
+
+  it('lastRejectionMessage optionnel — pas de champ si non fourni', async () => {
+    const t = makeT();
+
+    const challengeId = await t.run(async (ctx) => {
+      return ctx.db.insert('dailyChallenges', {
+        userId: 'user_1',
+        date: '2026-03-20',
+        challengeType: 'voice_session',
+        label: 'Voice session',
+        points: 50,
+        completed: false,
+      });
+    });
+
+    const now = Date.now();
+    await t.mutation(internal.gamification.updateValidationAttempt, {
+      challengeId,
+      lastValidationAttemptAt: now,
+    });
+
+    const challenge = await t.run(async ctx => ctx.db.get(challengeId));
+    expect(challenge!.lastValidationAttemptAt).toBe(now);
+    expect(challenge!.lastRejectionMessage).toBeUndefined();
+  });
+});

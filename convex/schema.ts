@@ -72,6 +72,8 @@ export default defineSchema({
     points: v.number(),
     completed: v.boolean(),
     completedAt: v.optional(v.number()),
+    lastValidationAttemptAt: v.optional(v.number()),
+    lastRejectionMessage: v.optional(v.string()),
   }).index('by_userId_date', ['userId', 'date']),
 
   goals: defineTable({

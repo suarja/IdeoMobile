@@ -494,42 +494,80 @@ export const completeDailyChallengeInternal = internalMutation({
   },
 });
 
+export const updateValidationAttempt = internalMutation({
+  args: {
+    challengeId: v.id('dailyChallenges'),
+    lastValidationAttemptAt: v.number(),
+    lastRejectionMessage: v.optional(v.string()),
+  },
+  handler: async (ctx, { challengeId, lastValidationAttemptAt, lastRejectionMessage }) => {
+    await ctx.db.patch(challengeId, { lastValidationAttemptAt, lastRejectionMessage });
+  },
+});
+
+const COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes
+
 export const validateAndCompleteDailyChallenge = action({
   args: {
     challengeId: v.id('dailyChallenges'),
     threadId: v.string(),
   },
-  handler: async (ctx, { challengeId, threadId }): Promise<{ approved: boolean; message: string }> => {
+  handler: async (ctx, { challengeId, threadId }): Promise<{ approved: boolean; message: string; cooldownUntil?: number }> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity)
       throw new Error('Unauthenticated');
 
-    const challenge: { label: string; points: number; completed: boolean } | null = await ctx.runQuery(
+    const challenge: {
+      label: string;
+      points: number;
+      completed: boolean;
+      lastValidationAttemptAt?: number;
+      lastRejectionMessage?: string;
+    } | null = await ctx.runQuery(
       internal.gamification.getDailyChallengeById,
       { challengeId },
     );
     if (!challenge)
       throw new Error('Challenge not found');
     if (challenge.completed)
-      return { approved: true, message: 'Already completed!' };
+      return { approved: true, message: 'Défi déjà complété !' };
+
+    // Cooldown check — skip AI call if within 30 min of last rejection
+    if (challenge.lastValidationAttemptAt) {
+      const elapsed = Date.now() - challenge.lastValidationAttemptAt;
+      if (elapsed < COOLDOWN_MS) {
+        return {
+          approved: false,
+          message: challenge.lastRejectionMessage ?? 'Tu peux réessayer dans quelques minutes.',
+          cooldownUntil: challenge.lastValidationAttemptAt + COOLDOWN_MS,
+        };
+      }
+    }
 
     const messages: Array<{ role: string; content: string }> = await ctx.runQuery(
       internal.chat.listMessagesInternal,
       { threadId },
     );
-    const history = messages.map(m => `${m.role}: ${m.content}`).join('\n');
+    const conversationText = messages.map(m => `${m.role}: ${m.content}`).join('\n');
 
     const { text } = await generateText({
       model: anthropic('claude-haiku-4-5-20251001'),
-      prompt: `Based on this conversation, did the user complete the challenge: "${challenge.label}"?
+      prompt: `
+Tu dois déterminer si l'utilisateur a complété le défi suivant : "${challenge.label}"
 
-Conversation:
-${history || '(no messages yet)'}
+Voici la conversation :
+${conversationText || '(aucun message pour l\'instant)'}
 
-Reply with valid JSON only, no markdown, no extra text:
-{"approved": true/false, "message": "1-2 sentence explanation (talk to the user, be encouraging, and if rejected, give hints on what they might have missed. You might assume that all the conversations are voice-based)."}
+Réponds UNIQUEMENT en JSON valide :
+{"approved": true/false, "message": "1-2 phrases"}
 
-Be lenient: if the conversation shows any attempt toward the challenge, approve it.`,
+Règles pour le message :
+- Adresse-toi directement à l'utilisateur en utilisant "tu"
+- Si approuvé : félicite-le chaleureusement et mentionne son accomplissement
+- Si refusé : encourage-le, explique brièvement ce qui manque et donne un conseil concret
+- Sois humain, chaleureux, jamais condescendant
+- Sois indulgent : si la conversation montre une tentative, approuve.
+`,
     });
 
     let result: { approved: boolean; message: string };
@@ -538,18 +576,27 @@ Be lenient: if the conversation shows any attempt toward the challenge, approve 
       const parsed = JSON.parse(raw) as { approved?: unknown; message?: unknown };
       result = {
         approved: parsed.approved === true,
-        message: typeof parsed.message === 'string' ? parsed.message : 'Validation complete.',
+        message: typeof parsed.message === 'string' ? parsed.message : 'Validation complète.',
       };
     }
     catch {
       // If parsing fails, approve optimistically so users aren't blocked
-      result = { approved: true, message: 'Challenge validated!' };
+      result = { approved: true, message: 'Défi validé !' };
     }
+
+    const now = Date.now();
 
     if (result.approved) {
       await ctx.runMutation(internal.gamification.completeDailyChallengeInternal, {
         challengeId,
         userId: identity.subject,
+      });
+    }
+    else {
+      await ctx.runMutation(internal.gamification.updateValidationAttempt, {
+        challengeId,
+        lastValidationAttemptAt: now,
+        lastRejectionMessage: result.message,
       });
     }
 
