@@ -1,4 +1,12 @@
 {
+  "daily_ritual": {
+    "challenges_empty": "لا تحديات لليوم بعد.",
+    "challenges_label": "تحدياتك اليوم",
+    "cta": "ابدأ وقفتي اليومية →",
+    "greeting": "صباح الخير ✦",
+    "mood_label": "الحالة المزاجية",
+    "points_to_next": "{{points}} نقطة للوصول إلى {{icon}} {{name}}"
+  },
   "focus": {
     "daily_objective": "هدف اليوم",
     "interactions": "التفاعلات الأخيرة",

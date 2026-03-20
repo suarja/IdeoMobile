@@ -114,6 +114,12 @@ For the mobile client, use `convex/react` with `ConvexProvider` (or `ConvexProvi
 - **Commits**: Conventional Commits format (enforced by commitlint). Direct commits to `main`/`master` are blocked.
 - **Pre-commit hook**: Runs `type-check` + `lint-staged` automatically.
 
+## Design System
+
+La charte graphique vivante est dans `docs/design-system/design-charter.md` — couleurs, typo, radius, icônes, screens de référence. **Consulter avant tout travail UI.**
+
+Direction : élégance par la retenue, moins de rondeur → `borderRadius: 12` par défaut (pas `999`), zéro divider, séparation par l'espace. Screens de référence : **DailyRitualModal** + **IdeaScreen**.
+
 ## Documentation Architecture
 
 Les décisions techniques importantes sont documentées dans `docs/architecture/`. Consulter avant de toucher aux systèmes concernés.

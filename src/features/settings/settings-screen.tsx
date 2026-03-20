@@ -2,12 +2,14 @@ import { useAuth, useUser } from '@clerk/expo';
 
 import { Ionicons } from '@expo/vector-icons';
 import Env from 'env';
+import { useRouter } from 'expo-router';
 import * as StoreReview from 'expo-store-review';
 import { useState } from 'react';
 import { Linking, Share as RNShare } from 'react-native';
 import {
   colors,
   FocusAwareStatusBar,
+  Pressable,
   ScrollView,
   Text,
   View,
@@ -16,6 +18,7 @@ import { Github, Rate, Share as ShareIcon, Support, Website } from '@/components
 import { useModal } from '@/components/ui/modal';
 import { translate } from '@/lib/i18n';
 import { useUserStats } from '../focus/api';
+import { DailyRitualModal } from '../idea/components/daily-ritual-modal';
 import { useAppConfig, useSetStandupTime, useUpsertUserProfile, useUserProfile } from './api';
 import { DevStorageBottomSheet } from './components/dev-storage-bottom-sheet';
 import { EditSocialLinksBottomSheet } from './components/edit-social-links-bottom-sheet';
@@ -176,6 +179,37 @@ function SectionAgent() {
   );
 }
 
+function SectionDeveloper({
+  iconColor,
+  onOpenStorage,
+  onOpenDailyRitual,
+}: {
+  iconColor: string;
+  onOpenStorage: () => void;
+  onOpenDailyRitual: () => void;
+}) {
+  return (
+    <SettingsContainer title="settings.developer">
+      <SettingsItem
+        text="settings.storage_manager"
+        icon={<Ionicons name="construct-outline" size={20} color={iconColor} />}
+        onPress={onOpenStorage}
+      />
+      <Pressable
+        className="flex-1 flex-row items-center justify-between px-4 py-3"
+        onPress={onOpenDailyRitual}
+      >
+        <View className="flex-row items-center">
+          <View className="pr-1.5">
+            <Ionicons name="sunny-outline" size={20} color={iconColor} />
+          </View>
+          <Text style={{ color: colors.brand.dark }}>Daily Ritual Modal</Text>
+        </View>
+      </Pressable>
+    </SettingsContainer>
+  );
+}
+
 function SectionAbout({ appConfig }: { appConfig: any }) {
   const iconColor = colors.brand.muted;
   return (
@@ -193,6 +227,7 @@ function SectionAbout({ appConfig }: { appConfig: any }) {
 
 export function SettingsScreen() {
   const { signOut } = useAuth();
+  const router = useRouter();
   const appConfig = useAppConfig();
   const userProfile = useUserProfile();
   const userStats = useUserStats();
@@ -204,6 +239,7 @@ export function SettingsScreen() {
   const editModal = useModal();
   const standupTimeModal = useModal();
   const devModal = useModal();
+  const [showDailyRitualDebug, setShowDailyRitualDebug] = useState(false);
 
   const { getLinksForPlatform, handleSocialSave } = buildSocialHandlers(
     selectedPlatform,
@@ -249,13 +285,11 @@ export function SettingsScreen() {
           <SectionAbout appConfig={appConfig} />
 
           {__DEV__ && (
-            <SettingsContainer title="settings.developer">
-              <SettingsItem
-                text="settings.storage_manager"
-                icon={<Ionicons name="construct-outline" size={20} color={iconColor} />}
-                onPress={() => devModal.present()}
-              />
-            </SettingsContainer>
+            <SectionDeveloper
+              iconColor={iconColor}
+              onOpenStorage={() => devModal.present()}
+              onOpenDailyRitual={() => setShowDailyRitualDebug(true)}
+            />
           )}
 
           <View className="my-8">
@@ -278,6 +312,14 @@ export function SettingsScreen() {
         onSave={time => setStandupTime({ time })}
       />
       <DevStorageBottomSheet modalRef={devModal.ref} />
+      <DailyRitualModal
+        visible={showDailyRitualDebug}
+        onClose={() => setShowDailyRitualDebug(false)}
+        onStartStandup={() => {
+          setShowDailyRitualDebug(false);
+          router.push('/(app)');
+        }}
+      />
     </>
   );
 }

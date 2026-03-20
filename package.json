@@ -85,6 +85,7 @@
     "i18next": "^25.8.0",
     "lodash.memoize": "^4.1.2",
     "moti": "^0.30.0",
+    "phosphor-react-native": "^3.0.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-error-boundary": "^6.1.0",
