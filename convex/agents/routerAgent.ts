@@ -116,9 +116,13 @@ export async function routeMessage({ content, userMem, projectMem, projectScores
       ? (parsed.specialist as AgentType)
       : 'general';
 
-    const processedMessage = typeof parsed.processedMessage === 'string' && parsed.processedMessage.length > 0
+    // If the original message is short, always use it verbatim — the LLM must not rephrase it.
+    // Threshold: 2000 chars ≈ 500 tokens. Above that, trust the LLM's compression.
+    const SHORT_MESSAGE_THRESHOLD = 2000;
+    const llmProcessed = typeof parsed.processedMessage === 'string' && parsed.processedMessage.length > 0
       ? parsed.processedMessage
       : content;
+    const processedMessage = content.length <= SHORT_MESSAGE_THRESHOLD ? content : llmProcessed;
 
     const selectedMemory = Array.isArray(parsed.selectedMemory)
       ? (parsed.selectedMemory as MemEntry[]).filter(
