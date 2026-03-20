@@ -47,7 +47,7 @@ function buildRouterPrompt(
     ? `\nWeak dimensions (score < 30, prioritize): ${weakDimensions.join(', ')}`
     : '';
 
-  return `You are a routing agent. Analyze the user message and decide which specialist agent to route it to.
+  return `You are a routing agent. Your job: route the user message to the right specialist and distill it into a sharp, first-person intent statement.
 
 Specialists:
 - general: strategic co-founder advice, motivation, blocking issues, general project questions
@@ -67,12 +67,20 @@ ${content}
 
 Instructions:
 1. Choose the best specialist for this message (default to "general" if unclear)
-2. processedMessage rules — critical:
-   - If the message is ≤ 800 tokens: return it VERBATIM, unchanged, as processedMessage
-   - If the message is > 800 tokens: compress to a concise first-person statement that starts with "I" ("I want to...", "I'm looking to...", "I need help with...") — preserve intent + key facts
+2. Write processedMessage — ALWAYS rewrite, never copy verbatim. Rules:
+   - First person: start with "I" ("I want to...", "I need...", "I'm trying to...")
+   - Distill intent: remove filler, keep every meaningful detail and nuance
+   - Add one agentic artifact at the end (after an em dash —): name the approach or tool
+     e.g. "— mapping competitors and gaps", "— reviewing stack options", "— drafting GTM strategy"
+   - 1-2 sentences max. No padding, no preamble.
+   - Examples:
+     input: "what are competitors using?"
+     output: "I want to understand the competitive tech landscape — analyzing competitor positioning and identifying gaps."
+     input: "I'm not sure if my idea makes sense for the market"
+     output: "I need to validate whether my idea has real market fit — assessing problem-solution alignment and target user signals."
 3. Select 3-5 memory fragments most relevant for the chosen specialist
 4. Return ONLY valid JSON, no prose, no markdown:
-{"specialist":"<type>","processedMessage":"<message or compressed version>","selectedMemory":[{"key":"...","value":"..."}]}`;
+{"specialist":"<type>","processedMessage":"<rewritten first-person statement>","selectedMemory":[{"key":"...","value":"..."}]}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,13 +124,9 @@ export async function routeMessage({ content, userMem, projectMem, projectScores
       ? (parsed.specialist as AgentType)
       : 'general';
 
-    // If the original message is short, always use it verbatim — the LLM must not rephrase it.
-    // Threshold: 2000 chars ≈ 500 tokens. Above that, trust the LLM's compression.
-    const SHORT_MESSAGE_THRESHOLD = 2000;
-    const llmProcessed = typeof parsed.processedMessage === 'string' && parsed.processedMessage.length > 0
+    const processedMessage = typeof parsed.processedMessage === 'string' && parsed.processedMessage.length > 0
       ? parsed.processedMessage
       : content;
-    const processedMessage = content.length <= SHORT_MESSAGE_THRESHOLD ? content : llmProcessed;
 
     const selectedMemory = Array.isArray(parsed.selectedMemory)
       ? (parsed.selectedMemory as MemEntry[]).filter(
