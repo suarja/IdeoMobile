@@ -33,13 +33,18 @@ const THREE_HOURS_MS = 3 * ONE_HOUR_MS;
 
 type Segment = { text: string; bold: boolean; italic: boolean };
 
+type Block
+  = | { kind: 'paragraph'; text: string }
+    | { kind: 'hr' }
+    | { kind: 'heading'; level: number; text: string }
+    | { kind: 'table'; headers: string[]; rows: string[][] };
+
 /**
  * Parses ***bold italic***, **bold**, *italic* and _italic_ into segments.
  * Falls back to plain text for anything not matched.
  */
 function parseMarkdownInline(raw: string): Segment[] {
   const segments: Segment[] = [];
-  // Matches: ***…***, **…**, *…*, _…_
   const RE = /\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*|_(.+?)_/gs;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -65,7 +70,81 @@ function parseMarkdownInline(raw: string): Segment[] {
   return segments.length > 0 ? segments : [{ text: raw, bold: false, italic: false }];
 }
 
-function AgentText({ text, baseStyle }: { text: string; baseStyle: object }) {
+function parseTableRow(line: string): string[] {
+  return line.split('|').slice(1, -1).map(c => c.trim());
+}
+
+/** Split agent text into rendering blocks (hr, heading, table, paragraph). */
+function parseBlocks(text: string): Block[] {
+  const lines = text.split('\n');
+  const blocks: Block[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Horizontal rule: ---, ***, ___
+    if (/^[-*_]{3,}\s*$/.test(trimmed) && trimmed.length <= 6) {
+      blocks.push({ kind: 'hr' });
+      i++;
+      continue;
+    }
+
+    // Heading: # / ## / ###
+    const headingMatch = /^(#{1,3})\s+(.+)/.exec(trimmed);
+    if (headingMatch) {
+      blocks.push({ kind: 'heading', level: headingMatch[1].length, text: headingMatch[2] });
+      i++;
+      continue;
+    }
+
+    // Table: lines starting with |
+    if (trimmed.startsWith('|')) {
+      const tableLines: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      if (tableLines.length >= 2) {
+        const [headerLine, separatorLine, ...dataLines] = tableLines;
+        if (/^[\s|:-]+$/.test(separatorLine)) {
+          blocks.push({
+            kind: 'table',
+            headers: parseTableRow(headerLine),
+            rows: dataLines.map(parseTableRow),
+          });
+          continue;
+        }
+      }
+      // Not a real table — fall through as paragraph
+      blocks.push({ kind: 'paragraph', text: tableLines.join('\n') });
+      continue;
+    }
+
+    // Paragraph — collect non-special lines
+    const paraLines: string[] = [];
+    while (i < lines.length) {
+      const l = lines[i];
+      const t = l.trim();
+      if (/^[-*_]{3,}\s*$/.test(t) && t.length <= 6)
+        break;
+      if (/^#{1,3}\s+/.test(t))
+        break;
+      if (t.startsWith('|'))
+        break;
+      paraLines.push(l);
+      i++;
+    }
+    if (paraLines.length > 0) {
+      blocks.push({ kind: 'paragraph', text: paraLines.join('\n') });
+    }
+  }
+
+  return blocks;
+}
+
+function InlineText({ text, baseStyle }: { text: string; baseStyle: object }) {
   const segments = parseMarkdownInline(text);
   if (segments.length === 1 && !segments[0].bold && !segments[0].italic) {
     return <Text style={baseStyle}>{text}</Text>;
@@ -87,6 +166,121 @@ function AgentText({ text, baseStyle }: { text: string; baseStyle: object }) {
     </Text>
   );
 }
+
+/** Block-level markdown renderer: paragraphs, headings, ---, and tables. */
+function AgentMarkdown({ text, baseStyle }: { text: string; baseStyle: object }) {
+  const blocks = parseBlocks(text);
+  return (
+    <>
+      {blocks.map((block, i) => {
+        if (block.kind === 'hr') {
+          return <View key={i} style={mdStyles.hr} />;
+        }
+        if (block.kind === 'heading') {
+          const headingStyle = block.level === 1
+            ? mdStyles.h1
+            : block.level === 2
+              ? mdStyles.h2
+              : mdStyles.h3;
+          return <Text key={i} style={headingStyle}>{block.text}</Text>;
+        }
+        if (block.kind === 'table') {
+          return (
+            <View key={i} style={mdStyles.table}>
+              {/* Header row */}
+              <View style={mdStyles.tableRow}>
+                {block.headers.map((h, ci) => (
+                  <View key={ci} style={[mdStyles.tableCell, mdStyles.tableHeaderCell]}>
+                    <Text style={mdStyles.tableHeaderText}>{h}</Text>
+                  </View>
+                ))}
+              </View>
+              {/* Data rows */}
+              {block.rows.map((row, ri) => (
+                <View key={ri} style={[mdStyles.tableRow, ri % 2 === 1 && mdStyles.tableRowAlt]}>
+                  {row.map((cell, ci) => (
+                    <View key={ci} style={mdStyles.tableCell}>
+                      <Text style={mdStyles.tableCellText}>{cell}</Text>
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </View>
+          );
+        }
+        // paragraph
+        return <InlineText key={i} text={block.text} baseStyle={baseStyle} />;
+      })}
+    </>
+  );
+}
+
+const mdStyles = StyleSheet.create({
+  hr: {
+    borderBottomColor: '#D4C8B8',
+    borderBottomWidth: 1,
+    marginVertical: 10,
+    opacity: 0.6,
+  },
+  h1: {
+    color: '#2C1810',
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 24,
+    marginBottom: 4,
+    marginTop: 10,
+  },
+  h2: {
+    color: '#2C1810',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 22,
+    marginBottom: 4,
+    marginTop: 8,
+  },
+  h3: {
+    color: '#5C3D28',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 20,
+    marginBottom: 2,
+    marginTop: 6,
+  },
+  table: {
+    borderColor: '#E0D8CC',
+    borderRadius: 8,
+    borderWidth: 1,
+    marginVertical: 8,
+    overflow: 'hidden',
+  },
+  tableRow: {
+    flexDirection: 'row',
+  },
+  tableRowAlt: {
+    backgroundColor: '#F9F5EE',
+  },
+  tableHeaderCell: {
+    backgroundColor: '#F0E8DC',
+  },
+  tableCell: {
+    borderColor: '#E0D8CC',
+    borderRightWidth: 1,
+    flex: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  tableHeaderText: {
+    color: '#2C1810',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  tableCellText: {
+    color: '#3D2010',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+});
 
 function InlineSynthesizing() {
   const rotation = useRef(new Animated.Value(0)).current;
@@ -328,10 +522,10 @@ export function IdeaScreen() {
           </View>
         )}
 
-        {/* Last user message */}
-        {session.lastUserMessage && !session.isSynthesizing && (
+        {/* Scope — shown as soon as the user message is in the thread, including during streaming */}
+        {session.lastUserMessage && (
           <View style={styles.userMessage}>
-            <Text style={styles.userMessageLabel}>You said</Text>
+            <Text style={styles.userMessageLabel}>Scope</Text>
             <Text style={styles.userMessageText} numberOfLines={3} ellipsizeMode="tail">
               {session.lastUserMessage.content}
             </Text>
@@ -342,7 +536,7 @@ export function IdeaScreen() {
         {(displayText || session.isSynthesizing) && (
           <View style={styles.agentMessage}>
             {!session.isSynthesizing && <Text style={styles.cardLabel}>Advisor</Text>}
-            <AgentText
+            <AgentMarkdown
               text={displayText + (session.isSynthesizing && session.streamingText ? '▌' : '')}
               baseStyle={styles.agentText}
             />
