@@ -129,6 +129,8 @@ Les décisions techniques importantes sont documentées dans `docs/architecture/
 | [`docs/architecture/auth.md`](docs/architecture/auth.md) | Clerk + Convex + SecureStore | Stack auth, flux SSO, persistence session, règles d'identité Convex |
 | [`docs/architecture/gamification.md`](docs/architecture/gamification.md) | Gamification + Focus Screen | 6 tables Convex (levels/userStats/projectScores/voiceSessions/dailyChallenges/goals), scoring, streak, cron défis, outils agent, Focus Screen wiring |
 | [`docs/architecture/agents.md`](docs/architecture/agents.md) | Multi-Agent + Streaming | Router Haiku + 5 spécialistes, `thread.streamText` + `saveStreamDeltas`, `listThreadMessages`, pattern `%%CLARIFY%%` pour la clarification |
+| [`docs/architecture/notifications.md`](docs/architecture/notifications.md) | Notifications locales + Push token | `useNotifications` hook, `NotificationProvider`, préférences en DB (`userProfiles`), push token stocké pour futures push notifs |
+| [`docs/architecture/usage-tracking.md`](docs/architecture/usage-tracking.md) | Usage tracking LLM + Web searches | Tables `apiUsage` + `webSearchLogs`, comptabilisation sans quota/blocage, filtrage par date, `detectedLanguage` router |
 
 ## Bugs Documentés
 
