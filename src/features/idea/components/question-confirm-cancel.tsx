@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, TouchableOpacity } from 'react-native';
 
 import { Text, View } from '@/components/ui';
+import { haptics } from '@/lib/services/haptics';
 
 type Props = {
   question: string;
@@ -25,6 +26,7 @@ export function QuestionConfirmCancel({
   const handleConfirm = () => {
     if (tapped || isDisabled)
       return;
+    haptics.medium();
     setTapped(true);
     onConfirm();
   };
@@ -32,6 +34,7 @@ export function QuestionConfirmCancel({
   const handleCancel = () => {
     if (tapped || isDisabled)
       return;
+    haptics.light();
     setTapped(true);
     onCancel();
   };

@@ -3,6 +3,7 @@ import { Animated, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, Text, View } from '@/components/ui';
+import { haptics } from '@/lib/services/haptics';
 
 type Props = {
   points: number;
@@ -20,6 +21,7 @@ export function PointsBanner({ points, label, visible, onDismiss }: Props) {
     if (!visible)
       return;
 
+    haptics.medium();
     Animated.parallel([
       Animated.spring(translateY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 10 }),
       Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),

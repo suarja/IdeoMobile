@@ -4,6 +4,7 @@ import { Modal, useModal } from '@/components/ui/modal';
 import { useProjectMemory, useUserMemory } from '@/features/focus/api';
 import { useActiveProject } from '@/features/idea/api';
 import { translate } from '@/lib/i18n';
+import { haptics } from '@/lib/services/haptics';
 
 import { SettingsItem } from './settings-item';
 
@@ -19,6 +20,7 @@ function MemoryRow({ memKey, value, onDelete, isLast }: MemoryRowProps) {
     <View>
       <TouchableOpacity
         onLongPress={() => {
+          haptics.medium();
           Alert.alert(translate('settings.memory_delete_confirm'), `${memKey}: ${value}`, [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Delete', style: 'destructive', onPress: onDelete },

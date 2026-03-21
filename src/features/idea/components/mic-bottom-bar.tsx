@@ -5,6 +5,7 @@ import { ActivityIndicator, StyleSheet, TextInput, TouchableOpacity } from 'reac
 import { colors, Text, View } from '@/components/ui';
 
 import { translate } from '@/lib/i18n';
+import { haptics } from '@/lib/services/haptics';
 
 type Props = {
   statusText: string;
@@ -34,6 +35,16 @@ export function MicBottomBar({
   const [isFocused, setIsFocused] = useState(false);
   const canSend = inputText.trim().length > 0;
 
+  const handleSend = () => {
+    haptics.medium();
+    onSend();
+  };
+
+  const handleMicPress = () => {
+    haptics.medium();
+    onPress();
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.inputRow}>
@@ -61,14 +72,14 @@ export function MicBottomBar({
             )}
 
         {canSend && !isListening && (
-          <TouchableOpacity onPress={onSend} style={styles.sendBtn} activeOpacity={0.7}>
+          <TouchableOpacity onPress={handleSend} style={styles.sendBtn} activeOpacity={0.7}>
             <Ionicons name="arrow-up" size={18} color={colors.brand.bg} />
           </TouchableOpacity>
         )}
       </View>
 
       <TouchableOpacity
-        onPress={onPress}
+        onPress={handleMicPress}
         activeOpacity={0.8}
         style={[styles.fab, isListening && styles.fabActive]}
         disabled={isDisabled}

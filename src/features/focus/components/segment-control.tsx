@@ -1,6 +1,7 @@
 import { TouchableOpacity, View } from 'react-native';
 
 import { colors, Text } from '@/components/ui';
+import { haptics } from '@/lib/services/haptics';
 
 export type SegmentTab = 'defis' | 'avancement';
 
@@ -25,7 +26,10 @@ export function SegmentControl({ activeTab, onChange }: SegmentControlProps) {
         return (
           <TouchableOpacity
             key={tab}
-            onPress={() => onChange(tab)}
+            onPress={() => {
+              haptics.selection();
+              onChange(tab);
+            }}
             style={{
               flex: 1,
               paddingVertical: 8,

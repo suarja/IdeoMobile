@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui';
 import colors from '@/components/ui/colors';
+import { haptics } from '@/lib/services/haptics';
 
 const TAB_BAR_WIDTH = 330;
 const TAB_BAR_HEIGHT = 72;
@@ -42,6 +43,7 @@ export function MetalOrangeTabBar({ state, navigation, descriptors }: BottomTabB
               canPreventDefault: true,
             });
             if (!isFocused && !event.defaultPrevented) {
+              haptics.light();
               navigation.navigate(route.name);
             }
           };

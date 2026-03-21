@@ -6,6 +6,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { colors, Text } from '@/components/ui';
 import { Modal, useModal } from '@/components/ui/modal';
+import { haptics } from '@/lib/services/haptics';
 
 type DailyStreakModalProps = {
   visible: boolean;
@@ -116,6 +117,7 @@ export function DailyStreakModal({ visible, currentStreak, activeDays, onClose }
 
   useEffect(() => {
     if (visible) {
+      haptics.success();
       setTimeout(() => present(), 100);
       setViewMode('week');
       setCurrentMonthDate(new Date());

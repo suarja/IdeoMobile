@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, TouchableOpacity } from 'react-native';
 
 import { Text, View } from '@/components/ui';
+import { haptics } from '@/lib/services/haptics';
 
 type Props = {
   question: string;
@@ -17,12 +18,14 @@ export function QuestionSingleChoice({ question, options, onSelect, isDisabled }
   const handlePress = (option: string) => {
     if (isDisabled || confirmed)
       return;
+    haptics.selection();
     setSelected(prev => prev === option ? null : option);
   };
 
   const handleConfirm = () => {
     if (confirmed || selected === null)
       return;
+    haptics.medium();
     setConfirmed(true);
     onSelect(selected);
   };

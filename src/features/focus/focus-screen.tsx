@@ -1,12 +1,12 @@
 import type { DailyChallenge, ProjectGoal, ProjectScores } from './api';
 
 import type { SegmentTab } from './components/segment-control';
-import * as Haptics from 'expo-haptics';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { ActivityIndicator, Modal, StyleSheet, TouchableOpacity } from 'react-native';
 import { colors, FocusAwareStatusBar, ScrollView, Text, View } from '@/components/ui';
 import { useModal } from '@/components/ui/modal';
+import { haptics } from '@/lib/services/haptics';
 import { DailyStreakModal } from '../idea/components/daily-streak-modal';
 import {
   localDateString,
@@ -154,7 +154,7 @@ function ChallengeRow({
       setShowCooldownModal(true);
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    haptics.light();
     setSparkTrigger(true);
     setTimeout(() => setSparkTrigger(false), 900);
     setValidating(true);
@@ -223,6 +223,14 @@ function DailyChallengesSection() {
   const challenges = useDailyChallenges(localDateString());
   const threadId = useActiveThreadId();
   const [rejectionMessage, setRejectionMessage] = useState<string | null>(null);
+  const hasTriggeredHaptic = useRef(false);
+
+  useEffect(() => {
+    if (!hasTriggeredHaptic.current && challenges && challenges.length > 0) {
+      hasTriggeredHaptic.current = true;
+      haptics.light();
+    }
+  }, [challenges]);
 
   return (
     <View className="mb-6">

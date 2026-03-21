@@ -1,5 +1,4 @@
 import type { BottomSheetModal } from '@gorhom/bottom-sheet';
-import * as Haptics from 'expo-haptics';
 import { Rocket } from 'phosphor-react-native';
 import { useState } from 'react';
 import * as React from 'react';
@@ -11,9 +10,10 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-
 import { colors, Text, View } from '@/components/ui';
+
 import { Modal } from '@/components/ui/modal';
+import { haptics } from '@/lib/services/haptics';
 
 import { LEVEL_ICON_MAP } from './level-header';
 import { SparkBurst } from './spark-burst';
@@ -45,12 +45,7 @@ export function LevelUpModal({
     setTimeout(() => setSparkTrigger(false), 1200);
     textOpacity.value = withDelay(450, withTiming(1, { duration: 250 }));
     textTranslateY.value = withDelay(450, withTiming(0, { duration: 250 }));
-    setTimeout(() => {
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-      catch {}
-    }, 300);
+    setTimeout(() => haptics.success(), 300);
   };
 
   const handleClose = () => {

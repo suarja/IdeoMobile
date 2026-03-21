@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, TouchableOpacity } from 'react-native';
 
 import { Text, View } from '@/components/ui';
+import { haptics } from '@/lib/services/haptics';
 
 type Props = {
   question: string;
@@ -17,6 +18,7 @@ export function QuestionMultiSelect({ question, options, onSelect, isDisabled }:
   const toggleOption = (option: string) => {
     if (isDisabled || confirmed)
       return;
+    haptics.selection();
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(option)) {
@@ -32,6 +34,7 @@ export function QuestionMultiSelect({ question, options, onSelect, isDisabled }:
   const handleConfirm = () => {
     if (confirmed || selected.size === 0)
       return;
+    haptics.medium();
     setConfirmed(true);
     onSelect(Array.from(selected).join(', '));
   };

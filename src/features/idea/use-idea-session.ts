@@ -1,6 +1,8 @@
 import { useConvexAuth } from 'convex/react';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+import { haptics } from '@/lib/services/haptics';
 
 import { useActiveProject, useAgentThreadMessages, useGetOrCreateThread, useSendMessage } from './api';
 
@@ -159,6 +161,17 @@ export function useIdeaSession(): IdeaSession {
   // Is synthesizing = we just sent OR there's an active streaming message
   const hasStreamingMsg = results.some(m => m.role === 'assistant' && m.status === 'streaming');
   const isSynthesizing = isSending || hasStreamingMsg;
+
+  const prevSynthesizing = useRef(false);
+  useEffect(() => {
+    if (isSynthesizing && !prevSynthesizing.current) {
+      haptics.light();
+    }
+    else if (!isSynthesizing && prevSynthesizing.current) {
+      haptics.light();
+    }
+    prevSynthesizing.current = isSynthesizing;
+  }, [isSynthesizing]);
 
   // Last completed assistant message text (stripped of markers for display)
   const lastCompletedAssistant = [...results]

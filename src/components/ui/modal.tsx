@@ -38,6 +38,7 @@ import * as React from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Path, Svg } from 'react-native-svg';
+import { haptics } from '@/lib/services/haptics';
 
 import { Text } from './text';
 
@@ -86,6 +87,11 @@ export function Modal({ ref, snapPoints: _snapPoints = ['60%'] as (string | numb
     [title, modal.dismiss],
   );
 
+  const handleChange = React.useCallback((index: number, position: number, type: Parameters<NonNullable<BottomSheetModalProps['onChange']>>[2]) => {
+    haptics.light();
+    props.onChange?.(index, position, type);
+  }, [props]);
+
   return (
     <BottomSheetModal
       {...props}
@@ -96,6 +102,7 @@ export function Modal({ ref, snapPoints: _snapPoints = ['60%'] as (string | numb
       backdropComponent={props.backdropComponent || renderBackdrop}
       enableDynamicSizing={false}
       handleComponent={renderHandleComponent}
+      onChange={handleChange}
     />
   );
 }

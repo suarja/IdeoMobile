@@ -2,6 +2,7 @@ import type { TxKeyPath } from '@/lib/i18n';
 
 import { Switch } from 'react-native';
 import { colors, Text, View } from '@/components/ui';
+import { haptics } from '@/lib/services/haptics';
 
 type Props = {
   text: TxKeyPath;
@@ -15,7 +16,10 @@ export function SettingsToggleItem({ text, value, onToggle }: Props) {
       <Text style={{ color: colors.brand.dark }} tx={text} />
       <Switch
         value={value}
-        onValueChange={onToggle}
+        onValueChange={(v) => {
+          haptics.light();
+          onToggle(v);
+        }}
         trackColor={{ false: colors.brand.border, true: colors.primary[400] }}
         thumbColor={colors.brand.bg}
         ios_backgroundColor={colors.brand.border}
