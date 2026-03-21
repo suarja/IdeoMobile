@@ -3,9 +3,11 @@ import { useConvexAuth } from 'convex/react';
 import { Redirect, SplashScreen, Tabs } from 'expo-router';
 import { useEffect, useRef } from 'react';
 
+import { ChallengeToastStack } from '@/components/challenge-toast-stack';
 import { MetalOrangeTabBar } from '@/components/metal-orange-tab-bar';
 import { localDateString, useDailyChallenges } from '@/features/focus/api';
 import { useIsFirstTime } from '@/lib/hooks/use-is-first-time';
+import { useNewChallengeToasts } from '@/lib/hooks/use-new-challenge-toasts';
 
 export default function TabLayout() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -31,6 +33,10 @@ export default function TabLayout() {
       && challenges.length > 0
       && challenges.some(c => !c.completed);
 
+  const [newChallenges, dismissChallenge] = useNewChallengeToasts(
+    Array.isArray(challenges) ? challenges : undefined,
+  );
+
   useEffect(() => {
     if (isLoaded) {
       void SplashScreen.hideAsync();
@@ -48,16 +54,19 @@ export default function TabLayout() {
   }
 
   return (
-    <Tabs
-      tabBar={props => <MetalOrangeTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
-    >
-      <Tabs.Screen name="index" />
-      <Tabs.Screen
-        name="focus"
-        options={{ tabBarBadge: hasPendingChallenges ? '!' : undefined }}
-      />
-      <Tabs.Screen name="settings" />
-    </Tabs>
+    <>
+      <Tabs
+        tabBar={props => <MetalOrangeTabBar {...props} />}
+        screenOptions={{ headerShown: false }}
+      >
+        <Tabs.Screen name="index" />
+        <Tabs.Screen
+          name="focus"
+          options={{ tabBarBadge: hasPendingChallenges ? '!' : undefined }}
+        />
+        <Tabs.Screen name="settings" />
+      </Tabs>
+      <ChallengeToastStack toasts={newChallenges} onDismiss={dismissChallenge} />
+    </>
   );
 }

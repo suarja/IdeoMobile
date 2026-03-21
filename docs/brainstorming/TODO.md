@@ -30,6 +30,8 @@ Peut-être qu'on ferait ça dans un workflow de convex, ou dans c'est pas un wor
 
 ### UI
 
+- Et ok, il faudrait ajouter le retour haptique un peu partout dans l'application. Je pense que ça peut faire l'objet d'une feature entière pour voir où est ce qu'on doit ajouter le retour haptique dans l'app. 
+
 
 ### Code
 
