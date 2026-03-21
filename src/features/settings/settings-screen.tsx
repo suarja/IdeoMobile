@@ -1,11 +1,13 @@
-import { useAuth, useUser } from '@clerk/expo';
+import type { DailyChallenge } from '../focus/api';
 
+import { useAuth, useUser } from '@clerk/expo';
 import { Ionicons } from '@expo/vector-icons';
 import Env from 'env';
 import { useRouter } from 'expo-router';
 import * as StoreReview from 'expo-store-review';
 import { useState } from 'react';
 import { Linking, Share as RNShare } from 'react-native';
+import { ChallengeToastStack } from '@/components/challenge-toast-stack';
 import {
   colors,
   FocusAwareStatusBar,
@@ -22,6 +24,7 @@ import { useUserStats } from '../focus/api';
 import { LevelUpModal } from '../focus/components/level-up-modal';
 import { NotificationModal } from '../focus/components/notification-modal';
 import { DailyRitualModal } from '../idea/components/daily-ritual-modal';
+import { PointsBanner } from '../idea/components/points-banner';
 import { useAppConfig, useSetStandupTime, useUpsertUserProfile, useUserProfile } from './api';
 import { DevStorageBottomSheet } from './components/dev-storage-bottom-sheet';
 import { EditSocialLinksBottomSheet } from './components/edit-social-links-bottom-sheet';
@@ -215,12 +218,16 @@ function SectionDeveloper({
   onOpenDailyRitual,
   onOpenLevelUp,
   onOpenNotification,
+  onShowPointsBanner,
+  onShowChallengeToast,
 }: {
   iconColor: string;
   onOpenStorage: () => void;
   onOpenDailyRitual: () => void;
   onOpenLevelUp: () => void;
   onOpenNotification: () => void;
+  onShowPointsBanner: () => void;
+  onShowChallengeToast: () => void;
 }) {
   return (
     <SettingsContainer title="settings.developer">
@@ -262,7 +269,28 @@ function SectionDeveloper({
           <Text style={{ color: colors.brand.dark }}>Notification</Text>
         </View>
       </Pressable>
-
+      <Pressable
+        className="flex-1 flex-row items-center justify-between px-4 py-3"
+        onPress={onShowPointsBanner}
+      >
+        <View className="flex-row items-center">
+          <View className="pr-1.5">
+            <Ionicons name="star-outline" size={20} color={iconColor} />
+          </View>
+          <Text style={{ color: colors.brand.dark }}>Points Banner</Text>
+        </View>
+      </Pressable>
+      <Pressable
+        className="flex-1 flex-row items-center justify-between px-4 py-3"
+        onPress={onShowChallengeToast}
+      >
+        <View className="flex-row items-center">
+          <View className="pr-1.5">
+            <Ionicons name="flash-outline" size={20} color={iconColor} />
+          </View>
+          <Text style={{ color: colors.brand.dark }}>Challenge Toast</Text>
+        </View>
+      </Pressable>
     </SettingsContainer>
   );
 }
@@ -282,9 +310,66 @@ function SectionAbout({ appConfig }: { appConfig: any }) {
   );
 }
 
+const DEBUG_CHALLENGE: DailyChallenge = {
+  _id: 'debug-challenge-1' as unknown as DailyChallenge['_id'],
+  label: 'Envoie un message à ton agent pour tester ce défi',
+  points: 15,
+  completed: false,
+  dimension: 'focus',
+};
+
+function useDevDebug() {
+  const devModal = useModal();
+  const levelUpDebugModal = useModal();
+  const notificationDebugModal = useModal();
+  const [showDailyRitual, setShowDailyRitual] = useState(false);
+  const [showPointsBanner, setShowPointsBanner] = useState(false);
+  const [challengeToasts, setChallengeToasts] = useState<DailyChallenge[]>([]);
+  return { devModal, levelUpDebugModal, notificationDebugModal, showDailyRitual, setShowDailyRitual, showPointsBanner, setShowPointsBanner, challengeToasts, setChallengeToasts };
+}
+
+type DevDebug = ReturnType<typeof useDevDebug>;
+
+function DevDebugOverlays({ dev }: { dev: DevDebug }) {
+  const router = useRouter();
+  return (
+    <>
+      <DevStorageBottomSheet modalRef={dev.devModal.ref} />
+      <DailyRitualModal
+        visible={dev.showDailyRitual}
+        onClose={() => dev.setShowDailyRitual(false)}
+        onStartStandup={() => {
+          dev.setShowDailyRitual(false);
+          router.push('/(app)');
+        }}
+      />
+      <LevelUpModal
+        modalRef={dev.levelUpDebugModal.ref}
+        newLevel={3}
+        newLevelName="Rocket"
+        newLevelIcon="🚀"
+        onDismiss={() => dev.levelUpDebugModal.dismiss()}
+      />
+      <NotificationModal
+        modalRef={dev.notificationDebugModal.ref}
+        onDismiss={() => dev.notificationDebugModal.dismiss()}
+      />
+      <PointsBanner
+        points={42}
+        label="Session terminée"
+        visible={dev.showPointsBanner}
+        onDismiss={() => dev.setShowPointsBanner(false)}
+      />
+      <ChallengeToastStack
+        toasts={dev.challengeToasts}
+        onDismiss={id => dev.setChallengeToasts(prev => prev.filter(c => (c._id as unknown as string) !== id))}
+      />
+    </>
+  );
+}
+
 export function SettingsScreen() {
   const { signOut } = useAuth();
-  const router = useRouter();
   const appConfig = useAppConfig();
   const userProfile = useUserProfile();
   const userStats = useUserStats();
@@ -295,10 +380,7 @@ export function SettingsScreen() {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
   const editModal = useModal();
   const standupTimeModal = useModal();
-  const devModal = useModal();
-  const levelUpDebugModal = useModal();
-  const notificationDebugModal = useModal();
-  const [showDailyRitualDebug, setShowDailyRitualDebug] = useState(false);
+  const dev = useDevDebug();
 
   const { getLinksForPlatform, handleSocialSave } = buildSocialHandlers(
     selectedPlatform,
@@ -312,7 +394,7 @@ export function SettingsScreen() {
   };
 
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <FocusAwareStatusBar style="dark" />
 
       <ScrollView style={{ backgroundColor: colors.brand.bg }}>
@@ -343,10 +425,12 @@ export function SettingsScreen() {
           {__DEV__ && (
             <SectionDeveloper
               iconColor={iconColor}
-              onOpenStorage={() => devModal.present()}
-              onOpenDailyRitual={() => setShowDailyRitualDebug(true)}
-              onOpenLevelUp={() => levelUpDebugModal.present()}
-              onOpenNotification={() => notificationDebugModal.present()}
+              onOpenStorage={() => dev.devModal.present()}
+              onOpenDailyRitual={() => dev.setShowDailyRitual(true)}
+              onOpenLevelUp={() => dev.levelUpDebugModal.present()}
+              onOpenNotification={() => dev.notificationDebugModal.present()}
+              onShowPointsBanner={() => dev.setShowPointsBanner(true)}
+              onShowChallengeToast={() => dev.setChallengeToasts([DEBUG_CHALLENGE])}
             />
           )}
 
@@ -369,26 +453,7 @@ export function SettingsScreen() {
         currentStandupTime={userStats?.standupTime || '09:00'}
         onSave={time => setStandupTime({ time })}
       />
-      <DevStorageBottomSheet modalRef={devModal.ref} />
-      <DailyRitualModal
-        visible={showDailyRitualDebug}
-        onClose={() => setShowDailyRitualDebug(false)}
-        onStartStandup={() => {
-          setShowDailyRitualDebug(false);
-          router.push('/(app)');
-        }}
-      />
-      <LevelUpModal
-        modalRef={levelUpDebugModal.ref}
-        newLevel={3}
-        newLevelName="Rocket"
-        newLevelIcon="🚀"
-        onDismiss={() => levelUpDebugModal.dismiss()}
-      />
-      <NotificationModal
-        modalRef={notificationDebugModal.ref}
-        onDismiss={() => notificationDebugModal.dismiss()}
-      />
-    </>
+      {__DEV__ && <DevDebugOverlays dev={dev} />}
+    </View>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, Text, View } from '@/components/ui';
 
@@ -11,6 +12,7 @@ type Props = {
 };
 
 export function PointsBanner({ points, label, visible, onDismiss }: Props) {
+  const { top } = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(-80)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -37,7 +39,7 @@ export function PointsBanner({ points, label, visible, onDismiss }: Props) {
     return null;
 
   return (
-    <Animated.View style={[styles.container, { transform: [{ translateY }], opacity }]}>
+    <Animated.View style={[styles.container, { top, transform: [{ translateY }], opacity }]}>
       <View style={styles.inner}>
         <Text style={styles.points}>{`+${points} pts`}</Text>
         {label && <Text style={styles.label}>{label}</Text>}
@@ -52,7 +54,6 @@ const styles = StyleSheet.create({
     left: 0,
     position: 'absolute',
     right: 0,
-    top: 0,
     zIndex: 100,
   },
   inner: {
