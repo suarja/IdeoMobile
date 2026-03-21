@@ -2,7 +2,7 @@
 
 > Document vivant. Reflète l'état réel du code, pas les maquettes Pencil.
 > Screens de référence : **DailyRitualModal** + **IdeaScreen** — les plus aboutis visuellement.
-> Mis à jour en dernier : mars 2026
+> Mis à jour en dernier : mars 2026 (EPIC C — Sillon System + Component Alignment)
 
 ---
 
@@ -64,13 +64,21 @@ Palette complète disponible : `primary` (orange), `charcoal`, `neutral`, `succe
 | Rôle | Font | Size | Weight | Color | LineHeight |
 |------|------|------|--------|-------|------------|
 | Titre modal / section | Georgia italic | 28 | — | `#A08060` | 38 |
-| Points total | Système | 28 | 800 | `#433831` | 38 |
-| Streak count | Système | 20 | 800 | `#433831` | 28 |
+| Streak count | Georgia italic | 28 | — | `#433831` | 32 |
 | Section label | Système | 10 | 700 | `#A08060` | — |
-| Body standard | Système | 14 | 600 | `#433831` | 20 |
-| Sous-titre muted | Système | 12 | 400 | `#433831` 50% | — |
-| Badge text | Système | 13 | 700 | `#FCFAEA` | — |
+| Body standard | Système | 14 | 400–600 | `#433831` | 20 |
+| Sous-titre muted / chip | Système | 11–12 | 400–600 | `#433831` 50–55% | — |
+| Badge text (LevelBadge) | Système | 11 | 700 | `#FCFAEA` | — |
 | Badge points pill | Système | 11 | 800 | `#FCFAEA` | — |
+
+> ⚠️ **Supprimé** : la ligne `Points total (28/800)` — remplacée par le chip niveau suivant (see § 6).
+
+### Streak — pattern visuel
+
+Le streak utilise désormais une hiérarchie à deux niveaux alignée à droite :
+- Chiffre en **Georgia italic 28** + icône `Fire` collée inline en exposant (`alignItems: 'flex-start'`, `size={12}`)
+- Label `JOURS` en small-caps engraved en dessous (`fontSize: 10, letterSpacing: 2`)
+- Bloc entier : `alignItems: 'flex-end'` pour coller à droite de la section
 
 ### Titres de section (composants)
 
@@ -107,8 +115,13 @@ Toujours : `fontSize: 10–12`, `fontWeight: '700'`, `letterSpacing: 0.5–2`, `
 | Token | Valeur | Usage |
 |-------|--------|-------|
 | `badge` | `6` | Badges niveau, streak, points, dimension — **valeur par défaut badge** |
+| `chip-sillon` | `5–6` | Chips débossés (next-level, pts challenge) |
 | `card` | `12` | Cartes de contenu (challenge card, goal card, table, bar chart) |
-| `button` | `16` | CTA pleine largeur |
+| `button` / `CTA` | `12` | CTA pleine largeur, bouton principal |
+| `fab` | `12` | FAB micro (MicBottomBar) — carré raffiné |
+| `send-btn` | `8` | Bouton d'envoi inline |
+| `chip` | `8` | Chips de continuation (SessionContinuationChips) |
+| `mood-tray` | `12` | Container débossé (mood, containers d'effet sillon) |
 | `tab-bar` | `14` | Barre de navigation flottante |
 | `progress-track` | `6` | Piste de toutes les barres de progression (effet sillon) |
 | `circle` | `999` | Cercles de streak/week-view uniquement |
@@ -116,6 +129,8 @@ Toujours : `fontSize: 10–12`, `fontWeight: '700'`, `letterSpacing: 0.5–2`, `
 
 **Règles clés :**
 - Badges (niveau, streak, points, dimension) → `borderRadius: 6`
+- FAB → `12` (plus `28` — cohérence carré raffiné)
+- CTA → `12` (plus `16`)
 - Pill/999 réservé aux cercles parfaits (week-view)
 - Jamais de `borderRadius: 999` sur des badges rectangulaires
 
@@ -156,6 +171,42 @@ const ENGRAVED_TEXT = {
 | `brand.bg` (#FCFAEA) | `rgba(255,255,255,0.7)` |
 | `brand.selected` (#FDF4CD) | `rgba(255,255,255,0.65)` |
 | `white` (#FFFFFF) | `rgba(180,160,120,0.2)` — chaud, très subtil |
+
+### Texte sillon — variante surface sombre
+
+Pour les textes sur fond sombre (tab bar, badges sombres) — l'intensité est réduite pour rester subtile :
+
+```typescript
+// Sillon surface sombre (tab bar labels sur #433831)
+{
+  textShadowColor: 'rgba(255,255,255,0.12)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 0,
+}
+```
+
+### Container débossé (effet sillon sur surface)
+
+Nouveau pattern EPIC C — simule un plateau/tray creusé dans la matière. Bord supérieur sombre (ombre), bord inférieur clair (reflet), même logique que la barre de progression mais appliquée à un container.
+
+```typescript
+// Container débossé — mood tray, chips next-level, chips pts
+const DEBOSSED_CONTAINER = {
+  backgroundColor: 'rgba(67,56,49,0.055)',
+  borderTopWidth: 1,    borderTopColor: 'rgba(0,0,0,0.07)',       // ombre
+  borderLeftWidth: 1,   borderLeftColor: 'rgba(0,0,0,0.04)',
+  borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.65)', // reflet
+  borderRightWidth: 1,  borderRightColor: 'rgba(255,255,255,0.5)',
+};
+// borderRadius selon contexte : 6 (chip), 12 (tray large)
+```
+
+**Usages actuels :**
+- `moodTray` → `borderRadius: 12`, `paddingVertical: 6`
+- `nextLevelChip` (DailyRitualModal) → `borderRadius: 6`, pill compact
+- `challengePtsChip` (DailyRitualModal) → `borderRadius: 5`, micro-chip
+
+**Règle** : ne pas en abuser — un seul container débossé par section max.
 
 ### Barre de progression — piste gravée
 
@@ -212,7 +263,8 @@ Les emojis de niveau sont stockés en DB (`levelIcon` field). Le composant fait 
 
 ```typescript
 // src/features/focus/components/level-header.tsx
-const LEVEL_ICON_MAP: Record<string, Icon> = {
+// ⚠️ Exporté — importer depuis ce fichier dans tout autre composant
+export const LEVEL_ICON_MAP: Record<string, Icon> = {
   '🌱': Plant,
   '💡': Lightbulb,
   '🔨': Hammer,
@@ -222,6 +274,8 @@ const LEVEL_ICON_MAP: Record<string, Icon> = {
 ```
 
 **Règle** : Ne plus utiliser d'emojis pour les éléments UI rendus. Les emojis restent en DB comme identifiants — toujours mapper vers Phosphor côté composant.
+
+**Fallback** : si l'emoji DB est inconnu → `Rocket` (`LevelUpModal`) ou `Leaf` (`LevelBadge`).
 
 ---
 
@@ -274,10 +328,55 @@ const LEVEL_ICON_MAP: Record<string, Icon> = {
 
 ### CTA pleine largeur
 ```typescript
-{ backgroundColor: '#433831', borderRadius: 16, paddingVertical: 18, alignItems: 'center' }
+{ backgroundColor: '#433831', borderRadius: 12, paddingVertical: 18, alignItems: 'center' }
 // Text
 { color: '#FCFAEA', fontSize: 16, fontWeight: '700' }
 ```
+
+### `LevelBadge` — composant partagé exporté
+
+```typescript
+// src/features/focus/components/level-header.tsx
+// Usage : import { LevelBadge } from '@/features/focus/components/level-header'
+<LevelBadge levelIcon={levelIcon} levelName={levelName} />
+```
+Badge dark compact : icône Phosphor (fill, 13px) + nom en uppercase. Utilisé dans `DailyRitualModal`, `LevelHeader`. Ne pas recréer localement.
+
+### Chip sillon next-level (DailyRitualModal)
+
+Sur la même ligne que le `LevelBadge`, côté droit (space-between) :
+```typescript
+// Contient : "{X} pts →" + <NextLevelIcon size={10} weight="fill" /> + "NOM NIVEAU"
+// Utiliser LEVEL_ICON_MAP pour résoudre l'icône depuis nextLevelIcon (emoji DB)
+```
+
+### Ligne challenge (DailyRitualModal)
+```typescript
+// Structure : trait accent | label | chip pts
+<View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 }}>
+  <View style={{ width: 2, height: 28, borderRadius: 1, backgroundColor: '#FF8A4C', opacity: 0.55 }} />
+  <Text style={{ flex: 1, fontSize: 14, fontWeight: '400' }}>{label}</Text>
+  <View style={DEBOSSED_CONTAINER /* borderRadius: 5 */}>
+    <Text style={{ fontSize: 11, fontWeight: '600', color: '#A08060' }}>+{pts}</Text>
+  </View>
+</View>
+```
+
+### FAB Mic (`MicBottomBar`)
+```typescript
+// fab — carré raffiné
+{ width: 56, height: 56, borderRadius: 12, backgroundColor: brand.dark }
+// sendBtn — inline
+{ width: 32, height: 32, borderRadius: 8, backgroundColor: brand.dark }
+```
+
+### `LevelUpModal` — BottomSheet
+
+Converti en `BottomSheetModal` (via `Modal` de `@/components/ui/modal`) :
+- Snap point : `['45%']`
+- Phosphor icon (via `LEVEL_ICON_MAP`, fallback `Rocket`) — plus d'emoji `fontSize: 56`
+- Animations Reanimated déclenchées via `onChange(index >= 0)`
+- `onDismiss` propagé au sheet pour fermeture par swipe/backdrop
 
 ### Cercle streak actif
 ```typescript
@@ -298,17 +397,34 @@ Composant : `AnimatedProgressBar` (`src/components/ui/animated-progress-bar.tsx`
 
 ### `DailyRitualModal` — meilleure incarnation du style
 `src/features/idea/components/daily-ritual-modal.tsx`
-- Zéro divider, tout séparé par espace
-- Titre Georgia italic `#A08060`
-- Badge + points sur même ligne (space-between)
-- Section labels small-caps `#A08060`
-- Phosphor icons pour moods (light/fill selon état)
-- Fire icon + texte pour le streak
+
+**Anatomie actuelle (après EPIC C) :**
+- Titre : Georgia italic `#A08060` — `greeting`
+- **Streak** : chiffre Georgia italic 28px + `Fire` inline exposant, label `JOURS` engraved, bloc aligné à droite
+- **Week-view** : 7 cercles Mo–Su, actif orange, manqué outline, futur ghost
+- **Level row** : `LevelBadge` à gauche + chip sillon next-level à droite (remplace gros `pointsTotal`)
+- **Progress bar** : `AnimatedProgressBar` avec piste sillon
+- **Mood tray** : 5 Phosphor Smiley dans un container débossé (`moodTray`)
+- **Challenges** : trait orange 2px + label 400 + chip pts sillon
+- **CTA** : `borderRadius: 12`, `paddingVertical: 18`
+- Zéro divider, séparation par `paddingVertical: 20` uniquement
 - Safe area insets sur le CTA
 
 ### `IdeaScreen` — référence pour le flow principal
 `src/features/idea/idea-screen.tsx`
 - Même palette cream/dark
-- `cardLabel` pattern (identique aux section labels ci-dessus)
-- FAB mic comme héros de l'interface
+- `headerTitle`, `cardLabel`, `userMessageLabel` : tous avec effet sillon
+- FAB mic avec `borderRadius: 12` (carré raffiné)
 - `AgentMarkdown` pour tout texte AI
+
+### `FocusScreen` — référence gamification
+`src/features/focus/focus-screen.tsx`
+- `LevelHeader` : badge + progress bar + infos niveau suivant (sillon)
+- `LevelUpModal` : BottomSheet, Phosphor icon animé, SparkBurst
+- Section labels avec effet sillon (`textShadowColor: rgba(255,255,255,0.65)` sur fond selected)
+
+### `MetalOrangeTabBar` — navigation flottante
+`src/components/metal-orange-tab-bar.tsx`
+- Pill dark `#433831`, `borderRadius: 14`, ombre portée
+- Labels avec sillon surface sombre (`rgba(255,255,255,0.12)`)
+- Ionicons : fill actif / outline inactif + `opacity: 0.45`

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { ChartBar, Compass, Megaphone, PaintBrush, Wrench } from 'phosphor-react-native';
 import { StyleSheet, TouchableOpacity } from 'react-native';
 
 import { colors, Text, View } from '@/components/ui';
@@ -11,12 +12,18 @@ type Props = {
   onNewTopic: (hint: AgentHint) => void;
 };
 
-const TOPIC_OPTIONS: Array<{ label: string; emoji: string; hint: AgentHint }> = [
-  { label: 'Question technique', emoji: '⚙️', hint: 'development' },
-  { label: 'Conseil stratégique', emoji: '🧭', hint: 'general' },
-  { label: 'Validation / Marché', emoji: '📊', hint: 'validation' },
-  { label: 'Design / UX', emoji: '🎨', hint: 'design' },
-  { label: 'Distribution', emoji: '📣', hint: 'distribution' },
+type TopicOption = {
+  label: string;
+  hint: AgentHint;
+  Icon: React.ComponentType<{ size: number; weight: 'regular'; color: string }>;
+};
+
+const TOPIC_OPTIONS: TopicOption[] = [
+  { label: 'Question technique', Icon: Wrench, hint: 'development' },
+  { label: 'Conseil stratégique', Icon: Compass, hint: 'general' },
+  { label: 'Validation / Marché', Icon: ChartBar, hint: 'validation' },
+  { label: 'Design / UX', Icon: PaintBrush, hint: 'design' },
+  { label: 'Distribution', Icon: Megaphone, hint: 'distribution' },
 ];
 
 export function SessionContinuationChips({ onContinue, onNewTopic }: Props) {
@@ -52,14 +59,14 @@ export function SessionContinuationChips({ onContinue, onNewTopic }: Props) {
       <Modal ref={ref} snapPoints={['45%']} backgroundStyle={{ backgroundColor: colors.brand.bg }}>
         <View style={styles.sheetContent}>
           <Text style={styles.sheetTitle}>Choisir un sujet</Text>
-          {TOPIC_OPTIONS.map(({ label, emoji, hint }, index) => (
+          {TOPIC_OPTIONS.map(({ label, Icon, hint }, index) => (
             <View key={hint}>
               <TouchableOpacity
                 onPress={() => handleTopicSelect(hint)}
                 style={styles.sheetRow}
                 activeOpacity={0.7}
               >
-                <Text style={styles.sheetEmoji}>{emoji}</Text>
+                <Icon size={18} weight="regular" color={colors.brand.muted} />
                 <Text style={styles.sheetLabel}>{label}</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.brand.muted} />
               </TouchableOpacity>
@@ -93,7 +100,7 @@ const styles = StyleSheet.create({
   chip: {
     alignItems: 'center',
     borderColor: colors.brand.border,
-    borderRadius: 20,
+    borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
     paddingHorizontal: 14,
@@ -106,11 +113,17 @@ const styles = StyleSheet.create({
   chipText: {
     color: colors.brand.dark,
     fontSize: 13,
+    textShadowColor: 'rgba(255,255,255,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 0,
   },
   primaryChipText: {
     color: colors.brand.bg,
     fontSize: 13,
     fontWeight: '600',
+    textShadowColor: 'rgba(255,255,255,0.15)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 0,
   },
   chevron: {
     marginLeft: 4,
@@ -136,10 +149,6 @@ const styles = StyleSheet.create({
   separator: {
     backgroundColor: colors.brand.border,
     height: 1,
-  },
-  sheetEmoji: {
-    fontSize: 18,
-    width: 22,
   },
   sheetLabel: {
     color: colors.brand.dark,

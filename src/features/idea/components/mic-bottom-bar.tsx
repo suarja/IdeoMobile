@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   sendBtn: {
     alignItems: 'center',
     backgroundColor: colors.brand.dark,
-    borderRadius: 16,
+    borderRadius: 8,
     height: 32,
     justifyContent: 'center',
     marginLeft: 8,
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.brand.dark,
     borderColor: colors.brand.border,
-    borderRadius: 28,
+    borderRadius: 12,
     borderWidth: 1,
     elevation: 4,
     height: 56,

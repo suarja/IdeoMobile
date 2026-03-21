@@ -20,6 +20,7 @@ import {
   useDailyChallenges,
   useUserStats,
 } from '@/features/focus/api';
+import { LEVEL_ICON_MAP, LevelBadge } from '@/features/focus/components/level-header';
 import { translate } from '@/lib/i18n';
 import { useSaveDailyMood } from '../api';
 
@@ -117,8 +118,8 @@ export function DailyRitualModal({ visible, onClose, onStartStandup }: Props) {
   const levelIcon = stats?.levelIcon ?? '';
   const nextLevelName = stats?.nextLevelName ?? '';
   const nextLevelIcon = stats?.nextLevelIcon ?? '';
-  const totalPoints = stats?.totalPoints ?? 0;
   const pointsToNext = stats?.pointsToNextLevel ?? 0;
+  const NextLevelIcon = nextLevelIcon ? (LEVEL_ICON_MAP[nextLevelIcon] ?? null) : null;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
@@ -141,12 +142,12 @@ export function DailyRitualModal({ visible, onClose, onStartStandup }: Props) {
         >
           {/* Streak section */}
           <View style={styles.section}>
-            <View style={styles.streakRow}>
-              <Fire weight="fill" size={22} color="#FF8A4C" />
-              <Text style={styles.streakCount}>
-                {currentStreak}
-                -day streak
-              </Text>
+            <View style={styles.streakBlock}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <Text style={styles.streakCount}>{currentStreak}</Text>
+                <Fire weight="fill" size={12} color="#FF8A4C" style={{ marginTop: 3, marginLeft: 2 }} />
+              </View>
+              <Text style={styles.streakUnit}>JOURS</Text>
             </View>
 
             {/* Week-view */}
@@ -186,26 +187,20 @@ export function DailyRitualModal({ visible, onClose, onStartStandup }: Props) {
           {stats && (
             <View style={styles.section}>
               <View style={styles.levelBadgeRow}>
-                <View style={styles.levelBadge}>
-                  <Text style={styles.levelBadgeText}>
-                    {levelIcon}
-                    {' '}
-                    {levelName}
-                  </Text>
-                </View>
-                <Text style={styles.pointsTotal}>
-                  {totalPoints.toLocaleString()}
-                  {' '}
-                  pts
-                </Text>
+                <LevelBadge levelIcon={levelIcon} levelName={levelName} />
+                {nextLevelName
+                  ? (
+                      <View style={styles.nextLevelChip}>
+                        <Text style={styles.nextLevelChipText}>
+                          {pointsToNext.toLocaleString()}
+                          {' pts →'}
+                        </Text>
+                        {NextLevelIcon && <NextLevelIcon size={10} weight="fill" color="rgba(67,56,49,0.5)" />}
+                        <Text style={styles.nextLevelChipText}>{nextLevelName.toUpperCase()}</Text>
+                      </View>
+                    )
+                  : null}
               </View>
-              {nextLevelName
-                ? (
-                    <Text style={styles.pointsNext}>
-                      {translate('daily_ritual.points_to_next', { points: pointsToNext.toLocaleString(), icon: nextLevelIcon, name: nextLevelName })}
-                    </Text>
-                  )
-                : null}
               <View style={styles.progressBarWrapper}>
                 <AnimatedProgressBar
                   progress={progressToNextLevel}
@@ -219,7 +214,7 @@ export function DailyRitualModal({ visible, onClose, onStartStandup }: Props) {
           {/* Mood section */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>{translate('daily_ritual.mood_label')}</Text>
-            <View style={styles.moodRow}>
+            <View style={styles.moodTray}>
               {MOODS.map((mood) => {
                 const isSelected = selectedMood === mood.score;
                 const MoodIcon = mood.icon;
@@ -232,8 +227,8 @@ export function DailyRitualModal({ visible, onClose, onStartStandup }: Props) {
                   >
                     <MoodIcon
                       weight={isSelected ? 'fill' : 'light'}
-                      size={34}
-                      color={isSelected ? '#C4773B' : 'rgba(67,56,49,0.45)'}
+                      size={32}
+                      color={isSelected ? '#C4773B' : 'rgba(67,56,49,0.38)'}
                     />
                   </TouchableOpacity>
                 );
@@ -250,13 +245,12 @@ export function DailyRitualModal({ visible, onClose, onStartStandup }: Props) {
                 )
               : challenges.map(challenge => (
                   <View key={challenge._id} style={styles.challengeRow}>
+                    <View style={styles.challengeAccent} />
                     <Text style={styles.challengeLabel} numberOfLines={2}>{challenge.label}</Text>
-                    <View style={styles.challengeBadge}>
-                      <Text style={styles.challengeBadgeText}>
+                    <View style={styles.challengePtsChip}>
+                      <Text style={styles.challengePts}>
                         +
                         {challenge.points}
-                        {' '}
-                        pts
                       </Text>
                     </View>
                   </View>
@@ -313,18 +307,30 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textTransform: 'uppercase',
     marginBottom: 16,
+    textShadowColor: 'rgba(255,255,255,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 0,
   },
-  streakRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  streakBlock: {
     marginBottom: 16,
+    alignItems: 'flex-end',
   },
   streakCount: {
-    fontSize: 20,
-    lineHeight: 28,
-    fontWeight: '800',
+    fontFamily: 'Georgia',
+    fontStyle: 'italic',
+    fontSize: 28,
+    lineHeight: 32,
     color: '#433831',
+  },
+  streakUnit: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#A08060',
+    letterSpacing: 2,
+    marginTop: 2,
+    textShadowColor: 'rgba(255,255,255,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 0,
   },
   weekContainer: {
     flexDirection: 'row',
@@ -374,40 +380,54 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  levelBadge: {
-    backgroundColor: '#433831',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+  nextLevelChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: 'rgba(67,56,49,0.055)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.07)',
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(0,0,0,0.04)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.65)',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255,255,255,0.5)',
   },
-  levelBadgeText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FCFAEA',
-  },
-  pointsTotal: {
-    fontSize: 28,
-    lineHeight: 38,
-    fontWeight: '800',
+  nextLevelChipText: {
+    fontSize: 11,
     color: '#433831',
-  },
-  pointsNext: {
-    fontSize: 12,
-    color: '#433831',
-    opacity: 0.5,
-    marginTop: 4,
+    opacity: 0.55,
+    textShadowColor: 'rgba(255,255,255,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 0,
   },
   progressBarWrapper: {
     marginTop: 14,
   },
-  moodRow: {
+  moodTray: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    backgroundColor: 'rgba(67,56,49,0.055)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.07)',
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(0,0,0,0.04)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.65)',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255,255,255,0.5)',
   },
   moodBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
@@ -416,7 +436,7 @@ const styles = StyleSheet.create({
   },
   moodBtnSelected: {
     borderColor: '#C4773B',
-    transform: [{ scale: 1.15 }],
+    transform: [{ scale: 1.12 }],
   },
   emptyChallenges: {
     fontSize: 14,
@@ -427,27 +447,44 @@ const styles = StyleSheet.create({
   challengeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: 11,
+    gap: 12,
+  },
+  challengeAccent: {
+    width: 2,
+    height: 28,
+    borderRadius: 1,
+    backgroundColor: '#FF8A4C',
+    opacity: 0.55,
   },
   challengeLabel: {
     flex: 1,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '400',
     color: '#433831',
     lineHeight: 20,
-    paddingRight: 12,
   },
-  challengeBadge: {
-    backgroundColor: '#433831',
-    borderRadius: 12,
-    paddingHorizontal: 8,
+  challengePtsChip: {
+    paddingHorizontal: 7,
     paddingVertical: 3,
+    borderRadius: 5,
+    backgroundColor: 'rgba(67,56,49,0.055)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.07)',
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(0,0,0,0.04)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.65)',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255,255,255,0.5)',
   },
-  challengeBadgeText: {
+  challengePts: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#FCFAEA',
+    fontWeight: '600',
+    color: '#A08060',
+    textShadowColor: 'rgba(255,255,255,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 0,
   },
   ctaContainer: {
     paddingHorizontal: 24,
@@ -456,7 +493,7 @@ const styles = StyleSheet.create({
   },
   ctaBtn: {
     backgroundColor: '#433831',
-    borderRadius: 16,
+    borderRadius: 12,
     paddingVertical: 18,
     alignItems: 'center',
   },

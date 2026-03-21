@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 
 import { ActivityIndicator, Modal, StyleSheet, TouchableOpacity } from 'react-native';
 import { colors, FocusAwareStatusBar, ScrollView, Text, View } from '@/components/ui';
+import { useModal } from '@/components/ui/modal';
 import { DailyStreakModal } from '../idea/components/daily-streak-modal';
 import {
   localDateString,
@@ -386,8 +387,17 @@ export function FocusScreen() {
   const scores = useProjectScores(threadId ?? null) as ProjectScores | undefined | null;
   const stats = useUserStats();
   const { showModal, levelUpData, dismiss } = useLevelUpDetection(stats);
+  const levelUpModal = useModal();
+  const { present: presentLevelUp, dismiss: dismissLevelUp } = levelUpModal;
   const [showStreakModal, setShowStreakModal] = useState(false);
   const [activeTab, setActiveTab] = useState<SegmentTab>('defis');
+
+  useEffect(() => {
+    if (showModal)
+      presentLevelUp();
+    else
+      dismissLevelUp();
+  }, [showModal, presentLevelUp, dismissLevelUp]);
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.brand.bg }}>
@@ -429,7 +439,7 @@ export function FocusScreen() {
       </ScrollView>
       {levelUpData && (
         <LevelUpModal
-          visible={showModal}
+          modalRef={levelUpModal.ref}
           newLevel={levelUpData.newLevel}
           newLevelName={levelUpData.newLevelName}
           newLevelIcon={levelUpData.newLevelIcon}

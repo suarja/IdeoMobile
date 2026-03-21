@@ -12,7 +12,7 @@ type LevelHeaderProps = {
 };
 
 // Mapping DB emoji → Phosphor icon component
-const LEVEL_ICON_MAP: Record<string, Icon> = {
+export const LEVEL_ICON_MAP: Record<string, Icon> = {
   '🌱': Plant,
   '💡': Lightbulb,
   '🔨': Hammer,
@@ -36,7 +36,7 @@ function LevelHeaderSkeleton() {
   );
 }
 
-function LevelBadge({ levelIcon, levelName }: { levelIcon: string; levelName: string }) {
+export function LevelBadge({ levelIcon, levelName }: { levelIcon: string; levelName: string }) {
   const LevelIconComponent = LEVEL_ICON_MAP[levelIcon] ?? Leaf;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: colors.brand.dark, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5, shadowColor: colors.brand.dark, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 }}>

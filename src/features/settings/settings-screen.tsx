@@ -18,6 +18,7 @@ import { Github, Rate, Share as ShareIcon, Support, Website } from '@/components
 import { useModal } from '@/components/ui/modal';
 import { translate } from '@/lib/i18n';
 import { useUserStats } from '../focus/api';
+import { LevelUpModal } from '../focus/components/level-up-modal';
 import { DailyRitualModal } from '../idea/components/daily-ritual-modal';
 import { useAppConfig, useSetStandupTime, useUpsertUserProfile, useUserProfile } from './api';
 import { DevStorageBottomSheet } from './components/dev-storage-bottom-sheet';
@@ -183,10 +184,12 @@ function SectionDeveloper({
   iconColor,
   onOpenStorage,
   onOpenDailyRitual,
+  onOpenLevelUp,
 }: {
   iconColor: string;
   onOpenStorage: () => void;
   onOpenDailyRitual: () => void;
+  onOpenLevelUp: () => void;
 }) {
   return (
     <SettingsContainer title="settings.developer">
@@ -204,6 +207,17 @@ function SectionDeveloper({
             <Ionicons name="sunny-outline" size={20} color={iconColor} />
           </View>
           <Text style={{ color: colors.brand.dark }}>Daily Ritual Modal</Text>
+        </View>
+      </Pressable>
+      <Pressable
+        className="flex-1 flex-row items-center justify-between px-4 py-3"
+        onPress={onOpenLevelUp}
+      >
+        <View className="flex-row items-center">
+          <View className="pr-1.5">
+            <Ionicons name="trophy-outline" size={20} color={iconColor} />
+          </View>
+          <Text style={{ color: colors.brand.dark }}>Level Up Modal</Text>
         </View>
       </Pressable>
     </SettingsContainer>
@@ -239,6 +253,7 @@ export function SettingsScreen() {
   const editModal = useModal();
   const standupTimeModal = useModal();
   const devModal = useModal();
+  const levelUpDebugModal = useModal();
   const [showDailyRitualDebug, setShowDailyRitualDebug] = useState(false);
 
   const { getLinksForPlatform, handleSocialSave } = buildSocialHandlers(
@@ -289,6 +304,7 @@ export function SettingsScreen() {
               iconColor={iconColor}
               onOpenStorage={() => devModal.present()}
               onOpenDailyRitual={() => setShowDailyRitualDebug(true)}
+              onOpenLevelUp={() => levelUpDebugModal.present()}
             />
           )}
 
@@ -319,6 +335,13 @@ export function SettingsScreen() {
           setShowDailyRitualDebug(false);
           router.push('/(app)');
         }}
+      />
+      <LevelUpModal
+        modalRef={levelUpDebugModal.ref}
+        newLevel={3}
+        newLevelName="Rocket"
+        newLevelIcon="🚀"
+        onDismiss={() => levelUpDebugModal.dismiss()}
       />
     </>
   );

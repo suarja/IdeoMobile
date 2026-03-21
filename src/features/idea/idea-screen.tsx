@@ -423,6 +423,9 @@ const styles = StyleSheet.create({
     color: colors.brand.dark,
     fontSize: 24,
     fontWeight: '700',
+    textShadowColor: 'rgba(255,255,255,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 0,
   },
   endBtn: {
     alignItems: 'center',
@@ -470,6 +473,9 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     marginBottom: 4,
     textTransform: 'uppercase',
+    textShadowColor: 'rgba(255,255,255,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 0,
   },
   userMessageText: {
     color: colors.brand.muted,
@@ -483,6 +489,9 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     marginBottom: 8,
     textTransform: 'uppercase',
+    textShadowColor: 'rgba(255,255,255,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 0,
   },
   agentMessage: {
     marginTop: 16,

@@ -110,6 +110,9 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 10,
     fontWeight: '600',
+    textShadowColor: 'rgba(255,255,255,0.12)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 0,
   },
   labelInactive: {
     opacity: 0.4,
