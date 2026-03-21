@@ -20,6 +20,12 @@ Il faut aussi revoir l'écran focus pour intégrer :
 - l'affichage des weights et du score
 - les différentes dimensions, donc sous forme de table, pour switcher entre les challenges et disons l'avancement
 
+- Donc il y a aussi l'histoire de la web search. Pour l'instant, on a mis en place une recherche par projet. En fait, les gens utilisent le tool sans vraiment être contraints, comme on avait dit, par exemple qu'ils prennent le temps de bien comprendre le projet, le score, ce qui est finalement le comportement qu'ils fassent des petites recherches comme ça. Finalement, c'est pas prévu, mais c'est intéressant.
+
+Je réfléchis à voir comment on pourrait créer, en plus de laisser cet outil de recherche, et permettre, à un moment donné, et c'est là vraiment où on a appliqué la recherche comme ça ponctuelle. Laissez mettre une limite moins rigide, et par contre, pour l'analyse de marché, donc vraiment une analyse de marché poussée avec analyse des concurrents, tout ça avec un rapport détaillé. Oui, on pourrait le limiter à une analyse de marché, comme ça serait une recherche par.
+
+Peut-être qu'on ferait ça dans un workflow de convex, ou dans c'est pas un workflow, on mettrait ça dans le work pool. Bref, pour en avoir avec les composants de convex, ce qui s'adapte le mieux. 
+
 ## Bugs
 
 ### UI

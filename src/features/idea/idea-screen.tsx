@@ -20,13 +20,13 @@ import { WhisperModelBottomSheet } from '../settings/components/whisper-model-bo
 import { useActiveThread, useMessages } from './api';
 import { AgentMarkdown } from './components/agent-markdown';
 import { ClarificationBlock } from './components/clarification-block';
+import { DailyRitualModal } from './components/daily-ritual-modal';
 import { DailyStreakModal } from './components/daily-streak-modal';
 import { InlineSynthesizing } from './components/inline-synthesizing';
 import { MicBottomBar } from './components/mic-bottom-bar';
 import { PointsBanner } from './components/points-banner';
 import { SessionContinuationChips } from './components/session-continuation-chips';
 import { SessionEndCard } from './components/session-end-card';
-import { StandupSplash } from './components/standup-splash';
 import { TranscriptBox } from './components/transcript-box';
 import { WhisperOnboardingModal } from './components/whisper-onboarding-modal';
 import { useStandupTrigger } from './hooks/use-standup-trigger';
@@ -402,7 +402,11 @@ export function IdeaScreen() {
         onClose={() => setShowStreakModal(false)}
       />
 
-      <StandupSplash visible={showStandupSplash} onDismiss={() => setShowStandupSplash(false)} />
+      <DailyRitualModal
+        visible={showStandupSplash}
+        onClose={() => setShowStandupSplash(false)}
+        onStartStandup={() => setShowStandupSplash(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
