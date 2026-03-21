@@ -36,6 +36,8 @@ export default defineSchema({
     lastSessionAt: v.number(),
     activeDays: v.optional(v.array(v.string())), // YYYY-MM-DD
     standupTime: v.optional(v.string()), // "HH:MM" format for daily standup reminder
+    monthlySearchCount: v.optional(v.number()), // real monthly web search count
+    searchMonthStart: v.optional(v.string()), // 'YYYY-MM' of current month window
   }).index('by_userId', ['userId']),
 
   projectScores: defineTable({
@@ -133,6 +135,33 @@ export default defineSchema({
     .index('by_projectId', ['projectId'])
     .index('by_projectId_key', ['projectId', 'key']),
 
+  // --- Web Search Logs ---
+
+  webSearchLogs: defineTable({
+    userId: v.string(),
+    threadId: v.string(),
+    specialist: v.string(),
+    query: v.string(),
+    resultCount: v.number(),
+    createdAt: v.number(),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_threadId', ['threadId']),
+
+  // --- API Usage ---
+
+  apiUsage: defineTable({
+    userId: v.string(),
+    threadId: v.string(),
+    specialist: v.string(),
+    model: v.string(),
+    inputTokens: v.number(),
+    outputTokens: v.number(),
+    createdAt: v.number(),
+  })
+    .index('by_userId', ['userId'])
+    .index('by_threadId', ['threadId']),
+
   // --- App Config ---
 
   appConfig: defineTable({
@@ -160,6 +189,10 @@ export default defineSchema({
         url: v.string(),
       }),
     ),
+    notificationPreferences: v.optional(v.object({
+      standupReminder: v.boolean(),
+    })),
+    pushToken: v.optional(v.string()), // device push token (APNs/FCM) — stored for future push notifications
     updatedAt: v.number(),
   }).index('by_userId', ['userId']),
 });

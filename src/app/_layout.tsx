@@ -14,6 +14,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { useThemeConfig } from '@/components/ui/use-theme-config';
 import { APIProvider } from '@/lib/api';
+import { NotificationProvider } from '@/lib/context/notification-context';
 import { loadSelectedTheme } from '@/lib/hooks/use-selected-theme';
 import Env from '../../env';
 import '@/lib/polyfills';
@@ -171,10 +172,12 @@ function Providers({ children }: { children: React.ReactNode }) {
           <KeyboardProvider>
             <ThemeProvider value={theme}>
               <APIProvider>
-                <BottomSheetModalProvider>
-                  {children}
-                  <FlashMessage position="top" />
-                </BottomSheetModalProvider>
+                <NotificationProvider>
+                  <BottomSheetModalProvider>
+                    {children}
+                    <FlashMessage position="top" />
+                  </BottomSheetModalProvider>
+                </NotificationProvider>
               </APIProvider>
             </ThemeProvider>
           </KeyboardProvider>

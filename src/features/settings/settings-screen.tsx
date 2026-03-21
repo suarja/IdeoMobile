@@ -16,9 +16,11 @@ import {
 } from '@/components/ui';
 import { Github, Rate, Share as ShareIcon, Support, Website } from '@/components/ui/icons';
 import { useModal } from '@/components/ui/modal';
+import { useNotificationContext } from '@/lib/context/notification-context';
 import { translate } from '@/lib/i18n';
 import { useUserStats } from '../focus/api';
 import { LevelUpModal } from '../focus/components/level-up-modal';
+import { NotificationModal } from '../focus/components/notification-modal';
 import { DailyRitualModal } from '../idea/components/daily-ritual-modal';
 import { useAppConfig, useSetStandupTime, useUpsertUserProfile, useUserProfile } from './api';
 import { DevStorageBottomSheet } from './components/dev-storage-bottom-sheet';
@@ -28,6 +30,7 @@ import { MemoryItem } from './components/memory-bottom-sheet';
 import { ProjectsItem } from './components/projects-bottom-sheet';
 import { SettingsContainer } from './components/settings-container';
 import { SettingsItem } from './components/settings-item';
+import { SettingsToggleItem } from './components/settings-toggle-item';
 import { SocialLinkRow } from './components/social-link-row';
 import { StandupTimeBottomSheet } from './components/standup-time-bottom-sheet';
 import { UserAvatar } from './components/user-avatar';
@@ -180,16 +183,44 @@ function SectionAgent() {
   );
 }
 
+function SectionNotifications({
+  standupTime,
+  onPressStandupTime,
+}: {
+  standupTime: string;
+  onPressStandupTime: () => void;
+}) {
+  const { notifPrefs, setStandupReminder } = useNotificationContext();
+  const standupEnabled = notifPrefs?.standupReminder ?? true;
+
+  return (
+    <SettingsContainer title="settings.notifications">
+      <SettingsToggleItem
+        text="settings.notification_standup"
+        value={standupEnabled}
+        onToggle={(value) => { void setStandupReminder(value); }}
+      />
+      <SettingsItem
+        text="settings.daily_standup_time"
+        value={standupTime}
+        onPress={onPressStandupTime}
+      />
+    </SettingsContainer>
+  );
+}
+
 function SectionDeveloper({
   iconColor,
   onOpenStorage,
   onOpenDailyRitual,
   onOpenLevelUp,
+  onOpenNotification,
 }: {
   iconColor: string;
   onOpenStorage: () => void;
   onOpenDailyRitual: () => void;
   onOpenLevelUp: () => void;
+  onOpenNotification: () => void;
 }) {
   return (
     <SettingsContainer title="settings.developer">
@@ -220,6 +251,18 @@ function SectionDeveloper({
           <Text style={{ color: colors.brand.dark }}>Level Up Modal</Text>
         </View>
       </Pressable>
+      <Pressable
+        className="flex-1 flex-row items-center justify-between px-4 py-3"
+        onPress={onOpenNotification}
+      >
+        <View className="flex-row items-center">
+          <View className="pr-1.5">
+            <Ionicons name="notifications-outline" size={20} color={iconColor} />
+          </View>
+          <Text style={{ color: colors.brand.dark }}>Notification</Text>
+        </View>
+      </Pressable>
+
     </SettingsContainer>
   );
 }
@@ -254,6 +297,7 @@ export function SettingsScreen() {
   const standupTimeModal = useModal();
   const devModal = useModal();
   const levelUpDebugModal = useModal();
+  const notificationDebugModal = useModal();
   const [showDailyRitualDebug, setShowDailyRitualDebug] = useState(false);
 
   const { getLinksForPlatform, handleSocialSave } = buildSocialHandlers(
@@ -279,13 +323,10 @@ export function SettingsScreen() {
             <LanguageItem />
           </SettingsContainer>
 
-          <SettingsContainer title="settings.my_profile">
-            <SettingsItem
-              text="settings.daily_standup"
-              value={userStats?.standupTime || '09:00'}
-              onPress={() => standupTimeModal.present()}
-            />
-          </SettingsContainer>
+          <SectionNotifications
+            standupTime={userStats?.standupTime || '09:00'}
+            onPressStandupTime={() => standupTimeModal.present()}
+          />
 
           <SocialSection
             openPlatform={openPlatform}
@@ -305,6 +346,7 @@ export function SettingsScreen() {
               onOpenStorage={() => devModal.present()}
               onOpenDailyRitual={() => setShowDailyRitualDebug(true)}
               onOpenLevelUp={() => levelUpDebugModal.present()}
+              onOpenNotification={() => notificationDebugModal.present()}
             />
           )}
 
@@ -342,6 +384,10 @@ export function SettingsScreen() {
         newLevelName="Rocket"
         newLevelIcon="🚀"
         onDismiss={() => levelUpDebugModal.dismiss()}
+      />
+      <NotificationModal
+        modalRef={notificationDebugModal.ref}
+        onDismiss={() => notificationDebugModal.dismiss()}
       />
     </>
   );

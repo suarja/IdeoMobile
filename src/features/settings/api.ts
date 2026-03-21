@@ -19,3 +19,11 @@ export function useUpsertUserProfile() {
 export function useSetStandupTime() {
   return useMutation(api.gamification.setStandupTime);
 }
+
+export function useSetNotificationPreferences() {
+  return useMutation(api.userProfiles.setNotificationPreferences);
+}
+
+export function useSetPushToken() {
+  return useMutation(api.userProfiles.setPushToken);
+}

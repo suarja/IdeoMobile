@@ -20,6 +20,7 @@ export type RouterDecision = {
   specialist: AgentType;
   processedMessage: string;
   selectedMemory: MemEntry[];
+  detectedLanguage: string; // BCP-47: 'fr', 'en', 'ar', 'es'...
 };
 
 // ---------------------------------------------------------------------------
@@ -56,7 +57,7 @@ Specialists:
 - development: tech stack, architecture, data models, implementation guidance, code decisions
 - distribution: go-to-market, launch strategy, content creation, growth, channels, viral mechanics
 
-Project radar scores (0-100):
+Project radar scores (0 to 100):
 ${scores}${weakNote}
 
 Memory fragments available:
@@ -79,8 +80,11 @@ Instructions:
      input: "I'm not sure if my idea makes sense for the market"
      output: "I need to validate whether my idea has real market fit — assessing problem-solution alignment and target user signals."
 3. Select 3-5 memory fragments most relevant for the chosen specialist
-4. Return ONLY valid JSON, no prose, no markdown:
-{"specialist":"<type>","processedMessage":"<rewritten first-person statement>","selectedMemory":[{"key":"...","value":"..."}]}`;
+4. Detect the language of the user's ORIGINAL message (before any rewriting).
+   Return it as detectedLanguage using a BCP-47 code (e.g. "fr", "en", "ar", "es").
+   Default to "en" if the language cannot be determined.
+5. Return ONLY valid JSON, no prose, no markdown:
+{"specialist":"<type>","processedMessage":"<rewritten first-person statement>","selectedMemory":[{"key":"...","value":"..."}],"detectedLanguage":"<bcp47>"}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,14 +106,14 @@ export async function routeMessage({ content, userMem, projectMem, projectScores
   let text: string;
   try {
     const result = await generateText({
-      model: anthropic('claude-haiku-4-5-20251001'),
+      model: anthropic('claude-haiku-4-5'),
       prompt: buildRouterPrompt(content, allMemory, projectScores),
     });
     text = result.text;
   }
   catch {
     // If routing fails, fall back to general agent with original message
-    return { specialist: 'general', processedMessage: content, selectedMemory: allMemory.slice(0, 5) };
+    return { specialist: 'general', processedMessage: content, selectedMemory: allMemory.slice(0, 5), detectedLanguage: 'en' };
   }
 
   try {
@@ -118,6 +122,7 @@ export async function routeMessage({ content, userMem, projectMem, projectScores
       specialist?: string;
       processedMessage?: string;
       selectedMemory?: unknown[];
+      detectedLanguage?: string;
     };
 
     const specialist = VALID_SPECIALISTS.includes(parsed.specialist as AgentType)
@@ -135,9 +140,13 @@ export async function routeMessage({ content, userMem, projectMem, projectScores
         ).slice(0, 5)
       : allMemory.slice(0, 5);
 
-    return { specialist, processedMessage, selectedMemory };
+    const detectedLanguage = typeof parsed.detectedLanguage === 'string' && parsed.detectedLanguage.length > 0
+      ? parsed.detectedLanguage
+      : 'en';
+
+    return { specialist, processedMessage, selectedMemory, detectedLanguage };
   }
   catch {
-    return { specialist: 'general', processedMessage: content, selectedMemory: allMemory.slice(0, 5) };
+    return { specialist: 'general', processedMessage: content, selectedMemory: allMemory.slice(0, 5), detectedLanguage: 'en' };
   }
 }

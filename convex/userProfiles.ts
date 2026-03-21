@@ -54,6 +54,49 @@ export const upsertUserProfile = mutation({
   },
 });
 
+export const setNotificationPreferences = mutation({
+  args: {
+    standupReminder: v.boolean(),
+  },
+  handler: async (ctx, { standupReminder }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      throw new Error('Unauthenticated');
+    const userId = identity.subject;
+    const existing = await ctx.db
+      .query('userProfiles')
+      .withIndex('by_userId', q => q.eq('userId', userId))
+      .first();
+    const notificationPreferences = { standupReminder };
+    if (existing) {
+      await ctx.db.patch(existing._id, { notificationPreferences, updatedAt: Date.now() });
+    }
+    else {
+      await ctx.db.insert('userProfiles', { userId, socialLinks: [], notificationPreferences, updatedAt: Date.now() });
+    }
+  },
+});
+
+export const setPushToken = mutation({
+  args: { token: v.optional(v.string()) },
+  handler: async (ctx, { token }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      throw new Error('Unauthenticated');
+    const userId = identity.subject;
+    const existing = await ctx.db
+      .query('userProfiles')
+      .withIndex('by_userId', q => q.eq('userId', userId))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, { pushToken: token, updatedAt: Date.now() });
+    }
+    else {
+      await ctx.db.insert('userProfiles', { userId, socialLinks: [], pushToken: token, updatedAt: Date.now() });
+    }
+  },
+});
+
 export const backfillUserProfilesAndStandupTime = mutation({
   args: {},
   handler: async (ctx) => {

@@ -116,7 +116,11 @@ type MemData = {
   userId?: string;
 };
 
-function buildFullPrompt(content: string, memData: MemData, lastMsgCreatedAt: number | null): string {
+type FullPromptArgs = { content: string; memData: MemData; lastMsgCreatedAt: number | null; detectedLanguage?: string };
+
+function buildFullPrompt({ content, memData, lastMsgCreatedAt, detectedLanguage = 'en' }: FullPromptArgs): string {
+  const languageDirective = `[SYSTEM: The user wrote in ${detectedLanguage}. You MUST respond ENTIRELY in ${detectedLanguage}. All clarification options and labels MUST be in ${detectedLanguage}.]`;
+
   let sessionGapNote = '';
   if (lastMsgCreatedAt !== null) {
     const gapHours = (Date.now() - lastMsgCreatedAt) / (1000 * 60 * 60);
@@ -134,7 +138,8 @@ function buildFullPrompt(content: string, memData: MemData, lastMsgCreatedAt: nu
     for (const m of memData.projectMem) memLines.push(`- ${m.key}: ${m.value}`);
   }
   const memCtx = memLines.length > 0 ? `\n\n${memLines.join('\n')}` : '';
-  return sessionGapNote ? `${sessionGapNote}\n\n${content}${memCtx}` : `${content}${memCtx}`;
+  const body = sessionGapNote ? `${sessionGapNote}\n\n${content}${memCtx}` : `${content}${memCtx}`;
+  return `${languageDirective}\n\n${body}`;
 }
 
 type RunMutationFn = (ref: any, args: any) => Promise<any>;
@@ -338,13 +343,6 @@ function buildSpecializedTools(
           ideaSummary: z.string().describe('1-sentence summary of the idea being validated'),
         }),
         execute: async ({ query, ideaSummary: _ideaSummary }) => {
-          const quota = await runQuery(internal.projects.getValidationSearchQuota, { threadId });
-          if ((quota as { projectCount: number; monthlyCount: number }).projectCount >= 1) {
-            return 'Search quota reached for this project (max 1 search/project).';
-          }
-          if ((quota as { projectCount: number; monthlyCount: number }).monthlyCount >= 4) {
-            return 'Monthly search quota reached (max 4/month).';
-          }
           let results: Array<{ title: string; url: string; content: string }>;
           try {
             results = await webSearch(query);
@@ -352,7 +350,14 @@ function buildSpecializedTools(
           catch (err) {
             return `Search unavailable: ${err instanceof Error ? err.message : 'Unknown error'}`;
           }
+          // Track search for analytics (no quota enforcement)
           await runMutation(internal.projects.incrementValidationSearchCount, { threadId });
+          await runMutation(internal.projects.insertWebSearchLog, {
+            threadId,
+            specialist,
+            query,
+            resultCount: results.length,
+          });
           return JSON.stringify(results);
         },
       }),
@@ -399,7 +404,7 @@ export const sendMessage = action({
     const lastMsgCreatedAt = lastMessages.length > 0
       ? (lastMessages[lastMessages.length - 1] as { createdAt: number }).createdAt
       : null;
-    const fullPrompt = buildFullPrompt(routerDecision.processedMessage, memDataForAgent, lastMsgCreatedAt);
+    const fullPrompt = buildFullPrompt({ content: routerDecision.processedMessage, memData: memDataForAgent, lastMsgCreatedAt, detectedLanguage: routerDecision.detectedLanguage });
 
     const selectedAgent = SPECIALIST_AGENTS[routerDecision.specialist as AgentType];
     const commonTools = buildCommonTools(
@@ -436,6 +441,18 @@ export const sendMessage = action({
       }
     }
     await ctx.runMutation(internal.chat.insertMessage, { threadId, role: 'assistant', content: responseText });
+
+    // Track token usage if available (best-effort — @convex-dev/agent may not expose usage directly)
+    const usage = await (result as any).usage?.catch?.(() => null) ?? null;
+    if (usage && (usage.promptTokens > 0 || usage.completionTokens > 0)) {
+      await ctx.runMutation(internal.chat.insertApiUsage, {
+        threadId,
+        specialist: routerDecision.specialist,
+        model: 'claude-sonnet-4.6',
+        inputTokens: usage.promptTokens ?? 0,
+        outputTokens: usage.completionTokens ?? 0,
+      });
+    }
 
     // Auto-award session points after every agent response (15 pts base; streak only on new sessions)
     await ctx.runMutation(internal.gamification.addSessionPoints, { threadId, basePoints: 15 });
@@ -518,7 +535,7 @@ export const generateThreadTitle = internalAction({
   args: { threadId: v.string(), content: v.string() },
   handler: async (ctx, { threadId, content }) => {
     const { text } = await generateText({
-      model: anthropic('claude-haiku-4-5-20251001'),
+      model: anthropic('claude-haiku-4-5'),
       prompt: `Give a concise 3-5 word project name for a project where someone says: "${content.slice(0, 300)}". Reply with ONLY the project name, no punctuation.`,
     });
     const title = text.trim().slice(0, 60);
@@ -564,5 +581,53 @@ export const getMemoryForThread = internalQuery({
     ]);
 
     return { userMem, projectMem, projectId, userId };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// API usage tracking
+// ---------------------------------------------------------------------------
+
+export const insertApiUsage = internalMutation({
+  args: {
+    threadId: v.string(),
+    specialist: v.string(),
+    model: v.string(),
+    inputTokens: v.number(),
+    outputTokens: v.number(),
+  },
+  handler: async (ctx, { threadId, specialist, model, inputTokens, outputTokens }) => {
+    const project = await ctx.db
+      .query('projects')
+      .withIndex('by_threadId', q => q.eq('threadId', threadId))
+      .first();
+    if (!project)
+      return;
+    await ctx.db.insert('apiUsage', {
+      userId: project.userId,
+      threadId,
+      specialist,
+      model,
+      inputTokens,
+      outputTokens,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+export const getUsageSummary = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const since = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const rows = await ctx.db
+      .query('apiUsage')
+      .withIndex('by_userId', q => q.eq('userId', userId))
+      .collect();
+    const recent = rows.filter(r => r.createdAt >= since);
+    return {
+      inputTokens: recent.reduce((s, r) => s + r.inputTokens, 0),
+      outputTokens: recent.reduce((s, r) => s + r.outputTokens, 0),
+      totalCalls: recent.length,
+    };
   },
 });

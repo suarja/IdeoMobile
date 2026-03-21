@@ -158,16 +158,17 @@ export const getValidationSearchQuota = internalQuery({
 
     const projectCount = project?.validationSearchCount ?? 0;
 
-    // Monthly count: sum all validationSearchCount across projects for this user in last 30 days
-    // For simplicity, we count the total across all user projects (since we can't filter by date here)
-    // A more precise approach would use a separate searches table — acceptable for POC
     let monthlyCount = 0;
     if (project) {
-      const allProjects = await ctx.db
-        .query('projects')
+      const currentMonth = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+      const userStats = await ctx.db
+        .query('userStats')
         .withIndex('by_userId', q => q.eq('userId', project.userId))
-        .collect();
-      monthlyCount = allProjects.reduce((sum, p) => sum + (p.validationSearchCount ?? 0), 0);
+        .first();
+      // If searchMonthStart matches current month, use the tracked count; otherwise treat as 0
+      if (userStats?.searchMonthStart === currentMonth) {
+        monthlyCount = userStats.monthlySearchCount ?? 0;
+      }
     }
 
     return { projectCount, monthlyCount };
@@ -183,7 +184,33 @@ export const incrementValidationSearchCount = internalMutation({
       .first();
     if (!project)
       return;
+    // Cumulative counter — never reset, no blocking
     const current = project.validationSearchCount ?? 0;
     await ctx.db.patch(project._id, { validationSearchCount: current + 1 });
+  },
+});
+
+export const insertWebSearchLog = internalMutation({
+  args: {
+    threadId: v.string(),
+    specialist: v.string(),
+    query: v.string(),
+    resultCount: v.number(),
+  },
+  handler: async (ctx, { threadId, specialist, query, resultCount }) => {
+    const project = await ctx.db
+      .query('projects')
+      .withIndex('by_threadId', q => q.eq('threadId', threadId))
+      .first();
+    if (!project)
+      return;
+    await ctx.db.insert('webSearchLogs', {
+      userId: project.userId,
+      threadId,
+      specialist,
+      query,
+      resultCount,
+      createdAt: Date.now(),
+    });
   },
 });
