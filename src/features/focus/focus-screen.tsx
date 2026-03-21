@@ -235,7 +235,7 @@ function DailyChallengesSection() {
               No challenges today — check back later.
             </Text>
           )
-        : challenges.map(item => (
+        : [...challenges].sort((a, b) => Number(a.completed) - Number(b.completed)).map(item => (
             <ChallengeRow
               key={item._id}
               item={item}
