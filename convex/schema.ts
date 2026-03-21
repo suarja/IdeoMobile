@@ -74,6 +74,8 @@ export default defineSchema({
     completedAt: v.optional(v.number()),
     lastValidationAttemptAt: v.optional(v.number()),
     lastRejectionMessage: v.optional(v.string()),
+    failed: v.optional(v.boolean()),
+    carriedOver: v.optional(v.boolean()),
   }).index('by_userId_date', ['userId', 'date']),
 
   goals: defineTable({

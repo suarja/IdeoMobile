@@ -1,4 +1,103 @@
-// Shared challenge pool and helpers used by crons and user init.
+// Shared challenge pool, helpers, and AI-powered challenge generation.
+
+import { anthropic } from '@ai-sdk/anthropic';
+import { generateText } from 'ai';
+import { v } from 'convex/values';
+import { internalAction } from './_generated/server';
+
+// ---------------------------------------------------------------------------
+// AI-powered personalized challenge generation
+// ---------------------------------------------------------------------------
+
+type PersonalizedResult = {
+  carriedOverLabels: string[];
+  newChallenges: Array<{ label: string; points: number; dimension?: string }>;
+};
+
+export const generatePersonalizedChallenges = internalAction({
+  args: {
+    userId: v.string(),
+    projectScores: v.optional(v.object({
+      validation: v.number(),
+      design: v.number(),
+      development: v.number(),
+      distribution: v.number(),
+    })),
+    lastSessionSummary: v.optional(v.string()),
+    yesterdayChallenges: v.array(v.object({
+      label: v.string(),
+      points: v.number(),
+      dimension: v.optional(v.string()),
+    })),
+  },
+  handler: async (_ctx, { projectScores, lastSessionSummary, yesterdayChallenges }): Promise<PersonalizedResult> => {
+    try {
+      const weakestDimension = projectScores
+        ? Object.entries(projectScores).sort(([, a], [, b]) => a - b)[0]?.[0]
+        : null;
+
+      const yesterdaySection = yesterdayChallenges.length > 0
+        ? `Yesterday's uncompleted challenges (decide which are still relevant today):\n${yesterdayChallenges.map(c => `- "${c.label}" (${c.points} pts${c.dimension ? `, ${c.dimension}` : ''})`).join('\n')}\n\n`
+        : '';
+      const scoresSection = projectScores
+        ? `Project radar scores (0-100): validation=${projectScores.validation}, design=${projectScores.design}, development=${projectScores.development}, distribution=${projectScores.distribution}. Weakest area: ${weakestDimension}.\n`
+        : '';
+      const summarySection = lastSessionSummary ? `Last session: ${lastSessionSummary}\n` : '';
+
+      const prompt = `You are a challenge advisor for a vibe coder productivity app.
+
+${yesterdaySection}${scoresSection}${summarySection}
+Generate 3 personalized daily challenges. Focus on the weakest project area. Each must be completable in one work session.
+
+Respond with ONLY valid JSON:
+{
+  "carriedOverLabels": ["exact label from yesterday if still relevant today"],
+  "newChallenges": [
+    {"label": "Action-oriented challenge", "points": 75, "dimension": "validation"},
+    {"label": "Another challenge", "points": 100, "dimension": "development"},
+    {"label": "Third challenge", "points": 50}
+  ]
+}
+
+Points: 50-150. dimension is optional: "validation", "design", "development", "distribution".`;
+
+      const { text } = await generateText({
+        model: anthropic('claude-haiku-4-5-20251001'),
+        prompt,
+      });
+
+      const raw = text.trim().replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+      const parsed = JSON.parse(raw) as { carriedOverLabels?: unknown; newChallenges?: unknown };
+
+      const carriedOverLabels = Array.isArray(parsed.carriedOverLabels)
+        ? (parsed.carriedOverLabels as string[]).filter(l => typeof l === 'string')
+        : [];
+
+      const newChallenges = Array.isArray(parsed.newChallenges)
+        ? (parsed.newChallenges as Array<{ label: string; points: number; dimension?: string }>)
+            .filter(c => typeof c.label === 'string' && typeof c.points === 'number')
+            .slice(0, 4)
+        : [];
+
+      return { carriedOverLabels, newChallenges };
+    }
+    catch {
+      const picked = pickRandom(SYSTEM_CHALLENGE_POOL, 3);
+      return {
+        carriedOverLabels: [],
+        newChallenges: picked.map(c => ({
+          label: c.label,
+          points: c.points,
+          ...(c.dimension !== undefined ? { dimension: c.dimension } : {}),
+        })),
+      };
+    }
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Shared challenge pool and helpers
+// ---------------------------------------------------------------------------
 
 export type ChallengeTemplate = {
   label: string;

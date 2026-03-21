@@ -781,8 +781,9 @@ export const createDailyChallengeInternal = internalMutation({
     points: v.number(),
     dimension: v.optional(v.string()),
     date: v.string(),
+    carriedOver: v.optional(v.boolean()),
   },
-  handler: async (ctx, { userId, label, points, dimension, date }) => {
+  handler: async (ctx, { userId, label, points, dimension, date, carriedOver }) => {
     return ctx.db.insert('dailyChallenges', {
       userId,
       date,
@@ -791,7 +792,47 @@ export const createDailyChallengeInternal = internalMutation({
       dimension,
       points,
       completed: false,
+      ...(carriedOver !== undefined ? { carriedOver } : {}),
     });
+  },
+});
+
+export const markChallengesAsFailed = internalMutation({
+  args: { challengeIds: v.array(v.id('dailyChallenges')) },
+  handler: async (ctx, { challengeIds }) => {
+    for (const id of challengeIds) {
+      await ctx.db.patch(id, { failed: true });
+    }
+  },
+});
+
+export const getActiveProjectContextForUser = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const project = await ctx.db
+      .query('projects')
+      .withIndex('by_userId_active', q => q.eq('userId', userId).eq('isActive', true))
+      .first();
+    if (!project)
+      return null;
+
+    const [scores, memory] = await Promise.all([
+      ctx.db.query('projectScores').withIndex('by_threadId', q => q.eq('threadId', project.threadId)).first(),
+      ctx.db.query('projectMemory').withIndex('by_projectId', q => q.eq('projectId', project._id)).collect(),
+    ]);
+
+    const lastSessionSummary = memory.find(m => m.key === 'lastSessionSummary')?.value ?? null;
+    return {
+      scores: scores
+        ? {
+            validation: scores.validationScore,
+            design: scores.designScore,
+            development: scores.developmentScore,
+            distribution: scores.distributionScore,
+          }
+        : null,
+      lastSessionSummary,
+    };
   },
 });
 

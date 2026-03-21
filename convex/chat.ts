@@ -251,7 +251,7 @@ function buildCommonTools(
       },
     }),
     completeDailyChallenge: tool({
-      description: 'Mark a daily challenge as completed. Call when the conversation demonstrates the challenge is done.',
+      description: 'Mark a daily challenge as completed. Call IMMEDIATELY when the conversation demonstrates the challenge is done — do NOT announce before calling. Call first, then mention it naturally in your response.',
       inputSchema: z.object({
         challengeId: z.string().describe('The _id of the dailyChallenge document'),
       }),
@@ -266,7 +266,7 @@ function buildCommonTools(
       },
     }),
     createDailyChallenge: tool({
-      description: 'Create a custom challenge tailored to the current session context. Use to replace generic challenges with more relevant ones.',
+      description: 'Create a custom challenge tailored to the current session context. Call automatically when all challenges are done, without waiting for user request. Use to replace generic challenges with more relevant ones.',
       inputSchema: z.object({
         label: z.string().describe('Clear action-oriented challenge label'),
         points: z.number().min(50).max(200),

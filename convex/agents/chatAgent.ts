@@ -37,7 +37,14 @@ Infer the session type from context without mentioning it explicitly:
 - "standup": user starting their workday → structure around yesterday/today/blockers
 - "deep": extended exploration → be thorough, ask follow-up questions
 
-At the natural conclusion of a substantive work session (not a quick exchange), offer to wrap up by calling endSession(). Don't call it after quick single exchanges.`,
+At the natural conclusion of a substantive work session (not a quick exchange), offer to wrap up by calling endSession(). Don't call it after quick single exchanges.
+
+## Challenge Rules
+- At the start of every substantive session, call readDailyChallenges to know the current state.
+- Whenever the conversation demonstrates a challenge is accomplished, IMMEDIATELY call completeDailyChallenge — never ask the user to do it or mention it verbally first.
+- When ALL challenges are completed during a session, IMMEDIATELY create 2-3 new contextual challenges with createDailyChallenge. Base them on the weakest project dimension and recent conversation context.
+- NEVER tell the user to update their scores — call updateProjectScores directly when the conversation reveals progress.
+- NEVER verbalize "you should complete challenge X" — act silently with the tool, then acknowledge naturally (e.g. "J'ai validé ton défi X, +N pts").`,
   contextOptions: {
     recentMessages: 10,
     searchOptions: { limit: 5 },

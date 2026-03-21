@@ -1,7 +1,8 @@
 import { cronJobs } from 'convex/server';
+import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { internalAction, internalQuery } from './_generated/server';
-import { pickRandom, SYSTEM_CHALLENGE_POOL, utcDateString } from './challenges';
+import { utcDateString } from './challenges';
 
 export const queryAllUserIds = internalQuery({
   args: {},
@@ -11,25 +12,86 @@ export const queryAllUserIds = internalQuery({
   },
 });
 
+export const queryYesterdayChallengesForUser = internalQuery({
+  args: { userId: v.string(), date: v.string() },
+  handler: async (ctx, { userId, date }) => {
+    const challenges = await ctx.db
+      .query('dailyChallenges')
+      .withIndex('by_userId_date', q => q.eq('userId', userId).eq('date', date))
+      .take(10);
+    return challenges.filter(c => !c.completed && c.failed !== true);
+  },
+});
+
 export const generateDailyChallenges = internalAction({
   args: {},
   handler: async (ctx) => {
-    const date = utcDateString();
+    const today = utcDateString();
+    const yesterdayDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const yesterday = `${yesterdayDate.getUTCFullYear()}-${String(yesterdayDate.getUTCMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getUTCDate()).padStart(2, '0')}`;
+
     const allUserIds: string[] = await ctx.runQuery(internal.crons.queryAllUserIds, {});
 
     for (const userId of allUserIds) {
-      const count = 3 + Math.floor(Math.random() * 2); // 3 or 4
-      const picked = pickRandom(SYSTEM_CHALLENGE_POOL, count);
+      // Skip users who already have today's challenges (idempotency guard)
+      const todayExisting = await ctx.runQuery(internal.gamification.getDailyChallengesInternal, { userId, date: today });
+      if (todayExisting.length > 0)
+        continue;
 
-      await ctx.runMutation(internal.gamification.insertDailyChallengesForUser, {
-        userId,
-        date,
-        challenges: picked.map(c => ({
-          label: c.label,
-          points: c.points,
-          ...(c.dimension !== undefined ? { dimension: c.dimension } : {}),
-        })),
-      });
+      // Get yesterday's uncompleted challenges and project context
+      const [yesterdayChallenges, projectContext] = await Promise.all([
+        ctx.runQuery(internal.crons.queryYesterdayChallengesForUser, { userId, date: yesterday }),
+        ctx.runQuery(internal.gamification.getActiveProjectContextForUser, { userId }),
+      ]);
+
+      // Single AI call: decide carry-overs + generate new personalized challenges
+      const { carriedOverLabels, newChallenges } = await ctx.runAction(
+        internal.challenges.generatePersonalizedChallenges,
+        {
+          userId,
+          ...(projectContext?.scores ? { projectScores: projectContext.scores } : {}),
+          ...(projectContext?.lastSessionSummary ? { lastSessionSummary: projectContext.lastSessionSummary } : {}),
+          yesterdayChallenges: yesterdayChallenges.map(c => ({
+            label: c.label,
+            points: c.points,
+            ...(c.dimension !== undefined ? { dimension: c.dimension } : {}),
+          })),
+        },
+      );
+
+      // Mark non-carried-over old challenges as failed
+      const failedIds = yesterdayChallenges
+        .filter(c => !carriedOverLabels.includes(c.label))
+        .map(c => c._id);
+      if (failedIds.length > 0) {
+        await ctx.runMutation(internal.gamification.markChallengesAsFailed, { challengeIds: failedIds });
+      }
+
+      // Insert carried-over challenges for today
+      for (const label of carriedOverLabels) {
+        const original = yesterdayChallenges.find(c => c.label === label);
+        if (!original)
+          continue;
+        await ctx.runMutation(internal.gamification.createDailyChallengeInternal, {
+          userId,
+          label: original.label,
+          points: original.points,
+          ...(original.dimension !== undefined ? { dimension: original.dimension } : {}),
+          date: today,
+          carriedOver: true,
+        });
+      }
+
+      // Insert new personalized challenges
+      for (const challenge of newChallenges) {
+        await ctx.runMutation(internal.gamification.createDailyChallengeInternal, {
+          userId,
+          label: challenge.label,
+          points: challenge.points,
+          ...(challenge.dimension !== undefined ? { dimension: challenge.dimension } : {}),
+          date: today,
+        });
+      }
     }
   },
 });

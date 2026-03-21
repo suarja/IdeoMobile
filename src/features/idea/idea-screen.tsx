@@ -86,6 +86,20 @@ export function IdeaScreen() {
   const messages = useMessages(activeThread?.threadId ?? null);
   const recordAppOpen = useMutation(api.gamification.recordAppOpen);
 
+  // Reactive PointsBanner: tracks totalPoints delta from any source (agent, challenges, etc.)
+  const prevPointsRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!userStats)
+      return;
+    const current = userStats.totalPoints;
+    if (prevPointsRef.current !== null && current > prevPointsRef.current) {
+      setPendingPoints(current - prevPointsRef.current);
+    }
+    prevPointsRef.current = current;
+  // eslint-disable-next-line react-compiler/react-compiler
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userStats?.totalPoints]);
+
   const [inputText, setInputText] = useState('');
   const [pendingPoints, setPendingPoints] = useState<number | null>(null);
   const [sessionEndDismissed, setSessionEndDismissed] = useState(false);
@@ -101,13 +115,10 @@ export function IdeaScreen() {
 
   const { showStandupSplash, setShowStandupSplash } = useStandupTrigger(userStats);
 
-  // Award app-open points on mount
+  // Award app-open points on mount (banner handled reactively via prevPointsRef)
   useEffect(() => {
     recordAppOpen()
       .then((result) => {
-        if (!result.skipped && result.pointsEarned) {
-          setPendingPoints(result.pointsEarned);
-        }
         if (result.currentStreak !== undefined && result.activeDays) {
           setStreakData({ currentStreak: result.currentStreak, activeDays: result.activeDays as string[] });
         }
