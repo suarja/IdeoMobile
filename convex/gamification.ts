@@ -156,6 +156,7 @@ export const getProjectScores = query({
         score: scores?.distributionScore ?? 0,
         weight: scores?.distributionWeight ?? 1.0,
       },
+      updatedAt: scores?.updatedAt ?? null,
     };
   },
 });

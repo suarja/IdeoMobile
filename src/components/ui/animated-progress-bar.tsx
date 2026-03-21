@@ -62,7 +62,7 @@ export function AnimatedProgressBar({ progress, height = 8, color, showSpark = t
     height,
     width: `${progressAnim.value}%`,
     backgroundColor: barColor,
-    borderRadius: 999,
+    borderRadius: 4,
     shadowColor: barColor,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -95,10 +95,16 @@ export function AnimatedProgressBar({ progress, height = 8, color, showSpark = t
     <View
       style={{
         height,
-        backgroundColor: 'rgba(67,56,49,0.2)',
-        borderRadius: 999,
+        backgroundColor: 'rgba(67,56,49,0.18)',
+        borderRadius: 6,
         overflow: 'visible',
         flex: 1,
+        // Effet sillon — bord haut sombre, bord bas clair → illusion de creux
+        borderWidth: 1,
+        borderTopColor: 'rgba(0,0,0,0.18)',
+        borderLeftColor: 'rgba(0,0,0,0.12)',
+        borderBottomColor: 'rgba(255,255,255,0.22)',
+        borderRightColor: 'rgba(255,255,255,0.16)',
       }}
       onLayout={handleTrackLayout}
     >

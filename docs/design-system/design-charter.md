@@ -72,13 +72,31 @@ Palette complète disponible : `primary` (orange), `charcoal`, `neutral`, `succe
 | Badge text | Système | 13 | 700 | `#FCFAEA` | — |
 | Badge points pill | Système | 11 | 800 | `#FCFAEA` | — |
 
-### Section labels
-Toujours : `fontSize: 10`, `fontWeight: '700'`, `letterSpacing: 2`, `textTransform: 'uppercase'`, `color: '#A08060'`, `marginBottom: 16`.
+### Titres de section (composants)
 
 ```typescript
-// Pattern à réutiliser partout
-{ fontSize: 10, fontWeight: '700', color: '#A08060', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 16 }
+// Titres de sections utilisateurs (Daily Challenges, Goals, Progression...)
+{ fontSize: 16, fontWeight: '600', color: brand.dark, letterSpacing: 1.2, textTransform: 'uppercase' }
+// + effet sillon (voir § Effet Sillon)
 ```
+
+### Section labels (petits labels d'en-tête)
+Toujours : `fontSize: 10–12`, `fontWeight: '700'`, `letterSpacing: 0.5–2`, `textTransform: 'uppercase'`, `color: '#A08060'`.
++ Appliquer l'effet sillon sur fond cream/selected.
+
+```typescript
+// Pattern court
+{ fontSize: 10, fontWeight: '700', color: '#A08060', letterSpacing: 2, textTransform: 'uppercase' }
+```
+
+### Hiérarchie de poids
+
+- **Titre section** : `fontWeight: '600'` (pas 800 — trop lourd)
+- **Body / label de carte** : `fontWeight: '500'`
+- **Badge text** : `fontWeight: '700'`
+- **Points pill** : `fontWeight: '800'`
+
+→ La hiérarchie passe par `letterSpacing` et `textTransform`, pas par le poids.
 
 ---
 
@@ -88,13 +106,76 @@ Toujours : `fontSize: 10`, `fontWeight: '700'`, `letterSpacing: 2`, `textTransfo
 
 | Token | Valeur | Usage |
 |-------|--------|-------|
-| `sharp` | `8` | Composants très structurés (futur) |
-| `card` | `12` | Badges, boutons, cartes principales — **valeur par défaut** |
+| `badge` | `6` | Badges niveau, streak, points, dimension — **valeur par défaut badge** |
+| `card` | `12` | Cartes de contenu (challenge card, goal card, table, bar chart) |
 | `button` | `16` | CTA pleine largeur |
+| `tab-bar` | `14` | Barre de navigation flottante |
+| `progress-track` | `6` | Piste de toutes les barres de progression (effet sillon) |
 | `circle` | `999` | Cercles de streak/week-view uniquement |
 | `avatar` | `28` | Cercles de profil |
 
-**Règle** : Par défaut → `borderRadius: 12`. Pill/999 uniquement pour les cercles parfaits (week-view). Les badges type "niveau" → `12`, pas `999`.
+**Règles clés :**
+- Badges (niveau, streak, points, dimension) → `borderRadius: 6`
+- Pill/999 réservé aux cercles parfaits (week-view)
+- Jamais de `borderRadius: 999` sur des badges rectangulaires
+
+---
+
+## 3b. Effet Sillon (Gravure)
+
+> Signature visuelle Ideo — donne un aspect taillé dans la matière, cousu main, premium.
+
+### Principe
+
+Simuler un creux dans la surface en ajoutant un reflet lumineux **1 pixel en dessous** du texte ou un bord asymétrique sur la piste d'une barre.
+
+### Texte gravé
+
+S'applique sur les fonds clairs (`brand.bg`, `brand.border`, `brand.selected`). Ne pas utiliser sur fonds sombres.
+
+```typescript
+// Style réutilisable — texte gravé sur cream
+const ENGRAVED_TEXT = {
+  color: 'rgba(67,56,49,0.55)',
+  textShadowColor: 'rgba(255,255,255,0.7)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 0,   // net, pas flou
+};
+```
+
+**Quand l'appliquer :**
+- Sous-titres informatifs dans les cartes (points vers le niveau suivant)
+- Titres de section (`fontSize: 12–16`)
+- En-têtes de colonnes de tableau (`color: '#A08060'`)
+- Texte muted secondaire
+
+**Intensité variable selon le fond :**
+
+| Fond | `textShadowColor` |
+|------|-------------------|
+| `brand.bg` (#FCFAEA) | `rgba(255,255,255,0.7)` |
+| `brand.selected` (#FDF4CD) | `rgba(255,255,255,0.65)` |
+| `white` (#FFFFFF) | `rgba(180,160,120,0.2)` — chaud, très subtil |
+
+### Barre de progression — piste gravée
+
+```typescript
+// Track — sillon creusé
+{
+  borderRadius: 6,
+  backgroundColor: 'rgba(67,56,49,0.18)',
+  borderWidth: 1,
+  borderTopColor: 'rgba(0,0,0,0.18)',    // bord ombre (haut = ombre)
+  borderLeftColor: 'rgba(0,0,0,0.12)',
+  borderBottomColor: 'rgba(255,255,255,0.22)', // bord reflet (bas = lumière)
+  borderRightColor: 'rgba(255,255,255,0.16)',
+}
+
+// Fill bar (dans la track)
+{ borderRadius: 4, height: '100%' }
+```
+
+Ce pattern simule un sillon de couture : bord supérieur sombre (ombre), bord inférieur clair (reflet de lumière), comme une rainure creusée dans la matière.
 
 ---
 
@@ -125,7 +206,22 @@ Toujours : `fontSize: 10`, `fontWeight: '700'`, `letterSpacing: 2`, `textTransfo
 | 4 | `Smiley` | Bien |
 | 5 | `SmileyWink` | Top |
 
-**Règle** : Ne plus utiliser d'emojis pour les éléments UI interactifs. Les emojis restent acceptables uniquement dans les strings stockées en DB (levelIcon).
+### Mapping niveaux (DB emoji → Phosphor)
+
+Les emojis de niveau sont stockés en DB (`levelIcon` field). Le composant fait la traduction côté client.
+
+```typescript
+// src/features/focus/components/level-header.tsx
+const LEVEL_ICON_MAP: Record<string, Icon> = {
+  '🌱': Plant,
+  '💡': Lightbulb,
+  '🔨': Hammer,
+  '⚡': Lightning,
+  '🚀': Rocket,
+};
+```
+
+**Règle** : Ne plus utiliser d'emojis pour les éléments UI rendus. Les emojis restent en DB comme identifiants — toujours mapper vers Phosphor côté composant.
 
 ---
 
@@ -141,20 +237,39 @@ Toujours : `fontSize: 10`, `fontWeight: '700'`, `letterSpacing: 2`, `textTransfo
 
 ## 6. Composants récurrents
 
-### Badge dark (niveau, points)
+### Badge dark (niveau, streak)
 ```typescript
-// Container
-{ backgroundColor: '#433831', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4 }
-// Text
-{ fontSize: 13, fontWeight: '700', color: '#FCFAEA' }
+// Container — icon + texte uppercase
+{
+  flexDirection: 'row', alignItems: 'center', gap: 6,
+  backgroundColor: '#433831', borderRadius: 6,
+  paddingHorizontal: 10, paddingVertical: 5,
+  elevation: 3,
+}
+// Text — uppercase + letterSpacing
+{ fontSize: 11, fontWeight: '700', color: '#FCFAEA', letterSpacing: 1.2 }
+// Icon — toujours Phosphor weight="fill"
+<PhosphorIcon size={13} weight="fill" color="#FCFAEA" />
 ```
 
-### Badge points pill (défis)
+### Badge points pill (défis, goals)
 ```typescript
 // Container
-{ backgroundColor: '#433831', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 }
+{ backgroundColor: '#433831', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, elevation: 2 }
 // Text
 { fontSize: 11, fontWeight: '800', color: '#FCFAEA' }
+```
+
+### Badge dimension (inline dans les cartes)
+```typescript
+// Container
+{
+  borderRadius: 6, borderWidth: 1, borderColor: `${brand.border}60`,
+  backgroundColor: brand.selected, paddingHorizontal: 8, paddingVertical: 3,
+  elevation: 2,
+}
+// Text
+{ fontSize: 10, fontWeight: '700', color: brand.dark }
 ```
 
 ### CTA pleine largeur
@@ -174,6 +289,8 @@ Composant : `AnimatedProgressBar` (`src/components/ui/animated-progress-bar.tsx`
 - `height={10}` en contexte modal/section
 - `animateOnMount={true}` pour sparks à l'ouverture
 - `showSpark={true}` par défaut
+- Piste avec **effet sillon** (bords asymétriques, voir § 3b)
+- Fill bar : `borderRadius: 4` (légèrement moins arrondi que la piste)
 
 ---
 

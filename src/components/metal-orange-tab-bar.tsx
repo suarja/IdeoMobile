@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   pill: {
     backgroundColor: colors.brand.dark,
     borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 20,
+    borderRadius: 14,
     borderWidth: 1,
     elevation: 12,
     flexDirection: 'row',

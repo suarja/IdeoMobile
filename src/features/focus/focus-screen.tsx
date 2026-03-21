@@ -1,9 +1,10 @@
-import type { DailyChallenge, ProjectGoal } from './api';
+import type { DailyChallenge, ProjectGoal, ProjectScores } from './api';
 
+import type { SegmentTab } from './components/segment-control';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, StyleSheet, TouchableOpacity } from 'react-native';
 
+import { ActivityIndicator, Modal, StyleSheet, TouchableOpacity } from 'react-native';
 import { colors, FocusAwareStatusBar, ScrollView, Text, View } from '@/components/ui';
 import { DailyStreakModal } from '../idea/components/daily-streak-modal';
 import {
@@ -16,9 +17,11 @@ import {
   useUserStats,
   useValidateAndCompleteDailyChallenge,
 } from './api';
+import { DimensionBarChart } from './components/dimension-bar-chart';
+import { DimensionsTable } from './components/dimensions-table';
 import { LevelHeader } from './components/level-header';
 import { LevelUpModal } from './components/level-up-modal';
-import { RadarChart } from './components/radar-chart';
+import { SegmentControl } from './components/segment-control';
 import { SparkBurst } from './components/spark-burst';
 import { useLevelUpDetection } from './hooks/use-level-up-detection';
 
@@ -27,12 +30,17 @@ function DimensionBadge({ dimension }: { dimension: string }) {
   return (
     <View
       style={{
-        paddingHorizontal: 10,
+        paddingHorizontal: 8,
         paddingVertical: 3,
-        borderRadius: 12,
+        borderRadius: 6,
         borderWidth: 1,
         borderColor: `${colors.brand.border}60`,
         backgroundColor: colors.brand.selected,
+        shadowColor: colors.brand.dark,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
       }}
     >
       <Text style={{ fontSize: 10, color: colors.brand.dark, fontWeight: '700' }}>{label}</Text>
@@ -215,32 +223,11 @@ function DailyChallengesSection() {
   const threadId = useActiveThreadId();
   const [rejectionMessage, setRejectionMessage] = useState<string | null>(null);
 
-  const completedCount = challenges?.filter(c => c.completed).length ?? 0;
-  const totalCount = challenges?.length ?? 0;
-
   return (
     <View className="mb-6">
-      <View className="mb-3 flex-row items-center justify-between">
-        <Text style={{ fontSize: 20, fontWeight: '800', color: colors.brand.dark, letterSpacing: -0.5 }}>
-          Daily challenges
-        </Text>
-        {completedCount < totalCount && totalCount > 0 && (
-          <View
-            style={{
-              paddingHorizontal: 8,
-              paddingVertical: 2,
-              backgroundColor: colors.brand.dark,
-              borderRadius: 12,
-            }}
-          >
-            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.white }}>
-              {completedCount}
-              /
-              {totalCount}
-            </Text>
-          </View>
-        )}
-      </View>
+      <Text className="mb-3" style={{ fontSize: 16, fontWeight: '600', color: colors.brand.dark, letterSpacing: 1.2, textTransform: 'uppercase', textShadowColor: 'rgba(255,255,255,0.65)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 0 }}>
+        Daily Challenges
+      </Text>
       {(!challenges || challenges.length === 0)
         ? (
             <Text className="text-sm" style={{ color: colors.brand.muted }}>
@@ -348,7 +335,12 @@ function GoalRow({ item, onComplete }: { item: ProjectGoal; onComplete: () => vo
         className="px-2.5 py-1"
         style={{
           backgroundColor: colors.brand.dark,
-          borderRadius: 12,
+          borderRadius: 6,
+          shadowColor: colors.brand.dark,
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.15,
+          shadowRadius: 2,
+          elevation: 2,
         }}
       >
         <Text style={{ fontSize: 11, fontWeight: '800', color: colors.brand.bg }}>
@@ -371,7 +363,7 @@ function ProjectGoalsSection() {
 
   return (
     <View className="mb-6">
-      <Text className="mb-3" style={{ fontSize: 20, fontWeight: '800', color: colors.brand.dark, letterSpacing: -0.5 }}>
+      <Text className="mb-3" style={{ fontSize: 16, fontWeight: '600', color: colors.brand.dark, letterSpacing: 1.2, textTransform: 'uppercase', textShadowColor: 'rgba(255,255,255,0.65)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 0 }}>
         Goals
       </Text>
       {goals.map(item => (
@@ -391,10 +383,11 @@ function ProjectGoalsSection() {
 
 export function FocusScreen() {
   const threadId = useActiveThreadId();
-  const scores = useProjectScores(threadId ?? null);
+  const scores = useProjectScores(threadId ?? null) as ProjectScores | undefined | null;
   const stats = useUserStats();
   const { showModal, levelUpData, dismiss } = useLevelUpDetection(stats);
   const [showStreakModal, setShowStreakModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<SegmentTab>('defis');
 
   return (
     <View className="flex-1" style={{ backgroundColor: colors.brand.bg }}>
@@ -405,9 +398,33 @@ export function FocusScreen() {
             Focus
           </Text>
           <LevelHeader stats={stats} onStreakPress={() => setShowStreakModal(true)} />
-          <RadarChart scores={scores} />
-          <DailyChallengesSection />
-          <ProjectGoalsSection />
+          {/* ScoreGlobalBanner désactivé temporairement — le score pondéré
+              sera réintégré quand la logique de pondération sera finalisée */}
+          {/* <ScoreGlobalBanner scores={scores} /> */}
+          <View style={{ marginTop: 16 }}>
+            <SegmentControl activeTab={activeTab} onChange={setActiveTab} />
+          </View>
+          {activeTab === 'defis' && (
+            <>
+              <DailyChallengesSection />
+              <ProjectGoalsSection />
+            </>
+          )}
+          {activeTab === 'avancement' && (
+            <>
+              {/* Barres de progression : score [0–100] et poids relatif de chaque dimension */}
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.brand.muted, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8, textShadowColor: 'rgba(255,255,255,0.65)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 0 }}>
+                Progression par dimension
+              </Text>
+              <DimensionBarChart scores={scores} />
+
+              {/* Tableau détaillé : score coloré par seuil, poids ×N, dernière activité relative */}
+              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.brand.muted, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8, marginTop: 8, textShadowColor: 'rgba(255,255,255,0.65)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 0 }}>
+                Détail
+              </Text>
+              <DimensionsTable scores={scores} />
+            </>
+          )}
         </View>
       </ScrollView>
       {levelUpData && (
@@ -460,11 +477,19 @@ const styles = StyleSheet.create({
   },
   challengeLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
+    textShadowColor: 'rgba(180,160,120,0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 0,
   },
   pointsBadge: {
     backgroundColor: colors.brand.dark,
-    borderRadius: 12,
+    borderRadius: 6,
+    shadowColor: colors.brand.dark,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
   },
   pointsText: {
     fontSize: 11,

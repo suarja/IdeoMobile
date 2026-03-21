@@ -69,6 +69,15 @@ export function localDateString(): string {
   return `${y}-${m}-${d}`;
 }
 
+export type DimensionScore = { score: number; weight: number };
+export type ProjectScores = {
+  validation: DimensionScore;
+  design: DimensionScore;
+  development: DimensionScore;
+  distribution: DimensionScore;
+  updatedAt: number | null;
+};
+
 export type DailyChallenge = {
   _id: Id<'dailyChallenges'>;
   label: string;
