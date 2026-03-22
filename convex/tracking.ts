@@ -1,5 +1,5 @@
 import { anthropic } from '@ai-sdk/anthropic';
-import { generateText, tool } from 'ai';
+import { generateText, stepCountIs, tool } from 'ai';
 import { z } from 'zod';
 
 import { internal } from './_generated/api';
@@ -197,6 +197,7 @@ export const generateDailyTrackingReports = internalAction({
         model: anthropic('claude-sonnet-4-6'),
         system: TRACKING_SYSTEM_PROMPT,
         prompt,
+        stopWhen: stepCountIs(6), // up to 5 web searches + 1 saveReport
         tools: {
           webSearch: buildWebSearchTool(ctx.runMutation.bind(ctx), project.threadId),
           saveReport: buildSaveReportTool(ctx.runMutation.bind(ctx), project.userId, project.threadId),

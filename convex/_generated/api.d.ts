@@ -15,6 +15,7 @@ import type * as agents_distributionAgent from "../agents/distributionAgent.js";
 import type * as agents_routerAgent from "../agents/routerAgent.js";
 import type * as agents_validationAgent from "../agents/validationAgent.js";
 import type * as appConfig from "../appConfig.js";
+import type * as artifacts from "../artifacts.js";
 import type * as challenges from "../challenges.js";
 import type * as chat from "../chat.js";
 import type * as crons from "../crons.js";
@@ -27,6 +28,7 @@ import type * as tools_webSearch_anthropicNative from "../tools/webSearch/anthro
 import type * as tools_webSearch_index from "../tools/webSearch/index.js";
 import type * as tools_webSearch_perplexity from "../tools/webSearch/perplexity.js";
 import type * as tools_webSearch_tavily from "../tools/webSearch/tavily.js";
+import type * as tracking from "../tracking.js";
 import type * as userProfiles from "../userProfiles.js";
 
 import type {
@@ -43,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   "agents/routerAgent": typeof agents_routerAgent;
   "agents/validationAgent": typeof agents_validationAgent;
   appConfig: typeof appConfig;
+  artifacts: typeof artifacts;
   challenges: typeof challenges;
   chat: typeof chat;
   crons: typeof crons;
@@ -55,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   "tools/webSearch/index": typeof tools_webSearch_index;
   "tools/webSearch/perplexity": typeof tools_webSearch_perplexity;
   "tools/webSearch/tavily": typeof tools_webSearch_tavily;
+  tracking: typeof tracking;
   userProfiles: typeof userProfiles;
 }>;
 
