@@ -1,4 +1,4 @@
-import { useConvexAuth, useMutation, useQuery } from 'convex/react';
+import { useAction, useConvexAuth, useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 
 // appConfig is public (no auth required)
@@ -30,4 +30,16 @@ export function useSetPushToken() {
 
 export function useUpdateProjectLinks() {
   return useMutation(api.projects.updateProjectLinks);
+}
+
+export function useSetGitHubToken() {
+  return useMutation(api.userProfiles.setGitHubToken);
+}
+
+export function useRemoveGitHubToken() {
+  return useMutation(api.userProfiles.removeGitHubToken);
+}
+
+export function useValidateGitHubToken() {
+  return useAction(api.github.validateGitHubToken);
 }

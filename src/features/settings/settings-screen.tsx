@@ -25,45 +25,18 @@ import { LevelUpModal } from '../focus/components/level-up-modal';
 import { NotificationModal } from '../focus/components/notification-modal';
 import { DailyRitualModal } from '../idea/components/daily-ritual-modal';
 import { PointsBanner } from '../idea/components/points-banner';
-import { useAppConfig, useSetStandupTime, useUpsertUserProfile, useUserProfile } from './api';
+import { useAppConfig, useSetStandupTime, useUserProfile } from './api';
 import { DevStorageBottomSheet } from './components/dev-storage-bottom-sheet';
-import { EditSocialLinksBottomSheet } from './components/edit-social-links-bottom-sheet';
 import { LanguageItem } from './components/language-item';
 import { MemoryItem } from './components/memory-bottom-sheet';
+import { ProfileBottomSheet } from './components/profile-bottom-sheet';
 import { ProjectsItem } from './components/projects-bottom-sheet';
 import { SettingsContainer } from './components/settings-container';
 import { SettingsItem } from './components/settings-item';
 import { SettingsToggleItem } from './components/settings-toggle-item';
-import { SocialLinkRow } from './components/social-link-row';
 import { StandupTimeBottomSheet } from './components/standup-time-bottom-sheet';
 import { UserAvatar } from './components/user-avatar';
 import { WhisperModelItem } from './components/whisper-model-item';
-
-type Platform = 'github' | 'instagram' | 'tiktok' | 'website';
-
-function buildSocialHandlers(
-  selectedPlatform: Platform | null,
-  userProfile: ReturnType<typeof useUserProfile>,
-  upsertUserProfile: ReturnType<typeof useUpsertUserProfile>,
-) {
-  const getLinksForPlatform = (platform: Platform) =>
-    userProfile?.socialLinks.filter(l => l.platform === platform) ?? [];
-
-  const handleSocialSave = (newLinks: Array<{ url: string }>) => {
-    if (!selectedPlatform) {
-      return;
-    }
-    const otherLinks
-      = userProfile?.socialLinks.filter(l => l.platform !== selectedPlatform) ?? [];
-    const mergedLinks = [
-      ...otherLinks,
-      ...newLinks.map(l => ({ platform: selectedPlatform, url: l.url })),
-    ];
-    void upsertUserProfile({ socialLinks: mergedLinks });
-  };
-
-  return { getLinksForPlatform, handleSocialSave };
-}
 
 function ProfileHeader() {
   const { user } = useUser();
@@ -156,23 +129,6 @@ function LinksSection({ iconColor, appConfig }: LinksSectionProps) {
         icon={<Website color={iconColor} />}
         onPress={() => { void Linking.openURL(appConfig?.websiteUrl ?? ''); }}
       />
-    </SettingsContainer>
-  );
-}
-
-function SocialSection({
-  openPlatform,
-  getLinksForPlatform,
-}: {
-  openPlatform: (p: Platform) => void;
-  getLinksForPlatform: (p: Platform) => any[];
-}) {
-  return (
-    <SettingsContainer title="settings.my_profile">
-      <SocialLinkRow platform="github" links={getLinksForPlatform('github')} onPress={() => openPlatform('github')} />
-      <SocialLinkRow platform="instagram" links={getLinksForPlatform('instagram')} onPress={() => openPlatform('instagram')} />
-      <SocialLinkRow platform="tiktok" links={getLinksForPlatform('tiktok')} onPress={() => openPlatform('tiktok')} />
-      <SocialLinkRow platform="website" links={getLinksForPlatform('website')} onPress={() => openPlatform('website')} />
     </SettingsContainer>
   );
 }
@@ -373,25 +329,14 @@ export function SettingsScreen() {
   const appConfig = useAppConfig();
   const userProfile = useUserProfile();
   const userStats = useUserStats();
-  const upsertUserProfile = useUpsertUserProfile();
   const setStandupTime = useSetStandupTime();
   const iconColor = colors.brand.muted;
 
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
-  const editModal = useModal();
+  const profileModal = useModal();
   const standupTimeModal = useModal();
   const dev = useDevDebug();
 
-  const { getLinksForPlatform, handleSocialSave } = buildSocialHandlers(
-    selectedPlatform,
-    userProfile,
-    upsertUserProfile,
-  );
-
-  const openPlatform = (platform: Platform) => {
-    setSelectedPlatform(platform);
-    editModal.present();
-  };
+  const hasProfileLinks = (userProfile?.socialLinks.length ?? 0) > 0 || !!userProfile?.githubToken;
 
   return (
     <View style={{ flex: 1 }}>
@@ -410,10 +355,13 @@ export function SettingsScreen() {
             onPressStandupTime={() => standupTimeModal.present()}
           />
 
-          <SocialSection
-            openPlatform={openPlatform}
-            getLinksForPlatform={getLinksForPlatform}
-          />
+          <SettingsContainer title="settings.my_profile">
+            <SettingsItem
+              text="settings.edit_profile"
+              value={hasProfileLinks ? translate('settings.configured') : undefined}
+              onPress={() => profileModal.present()}
+            />
+          </SettingsContainer>
 
           <SettingsContainer title="settings.voice_model">
             <WhisperModelItem />
@@ -442,12 +390,7 @@ export function SettingsScreen() {
         </View>
       </ScrollView>
 
-      <EditSocialLinksBottomSheet
-        ref={editModal.ref}
-        platform={selectedPlatform}
-        links={selectedPlatform ? getLinksForPlatform(selectedPlatform) : []}
-        onSave={handleSocialSave}
-      />
+      <ProfileBottomSheet ref={profileModal.ref} />
       <StandupTimeBottomSheet
         ref={standupTimeModal.ref}
         currentStandupTime={userStats?.standupTime || '09:00'}

@@ -107,6 +107,43 @@ export const setPushToken = mutation({
   },
 });
 
+export const setGitHubToken = mutation({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      throw new Error('Unauthenticated');
+    const userId = identity.subject;
+    const existing = await ctx.db
+      .query('userProfiles')
+      .withIndex('by_userId', q => q.eq('userId', userId))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, { githubToken: token, updatedAt: Date.now() });
+    }
+    else {
+      await ctx.db.insert('userProfiles', { userId, socialLinks: [], githubToken: token, updatedAt: Date.now() });
+    }
+  },
+});
+
+export const removeGitHubToken = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      throw new Error('Unauthenticated');
+    const userId = identity.subject;
+    const existing = await ctx.db
+      .query('userProfiles')
+      .withIndex('by_userId', q => q.eq('userId', userId))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, { githubToken: undefined, updatedAt: Date.now() });
+    }
+  },
+});
+
 export const backfillUserProfilesAndStandupTime = mutation({
   args: {},
   handler: async (ctx) => {

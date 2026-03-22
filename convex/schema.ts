@@ -215,6 +215,16 @@ export default defineSchema({
       standupReminder: v.boolean(),
     })),
     pushToken: v.optional(v.string()), // device push token (APNs/FCM) — stored for future push notifications
+    githubToken: v.optional(v.string()), // GitHub PAT for accessing private repos
     updatedAt: v.number(),
   }).index('by_userId', ['userId']),
+
+  // --- Scrape Cache ---
+
+  scrapeCache: defineTable({
+    userId: v.string(),
+    url: v.string(),
+    content: v.string(),
+    scrapedAt: v.number(),
+  }).index('by_userId_url', ['userId', 'url']),
 });
