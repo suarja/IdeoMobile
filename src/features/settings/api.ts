@@ -27,3 +27,7 @@ export function useSetNotificationPreferences() {
 export function useSetPushToken() {
   return useMutation(api.userProfiles.setPushToken);
 }
+
+export function useUpdateProjectLinks() {
+  return useMutation(api.projects.updateProjectLinks);
+}

@@ -333,6 +333,7 @@ function buildSpecializedTools(
   runMutation: RunMutationFn,
   runQuery: RunQueryFn,
   threadId: string,
+  userId: string,
 ) {
   if (specialist === 'validation' || specialist === 'distribution') {
     return {
@@ -359,6 +360,27 @@ function buildSpecializedTools(
             resultCount: results.length,
           });
           return JSON.stringify(results);
+        },
+      }),
+      saveReport: tool({
+        description: 'Save a structured validation or tracking report as a persistent artifact visible in the Insights tab. Always include a concise tldr (2-3 sentences) for continuity with future reports.',
+        inputSchema: z.object({
+          type: z.enum(['validation', 'tracking']),
+          title: z.string().describe('Short descriptive title, e.g. "Market Analysis – 22 Mar"'),
+          content: z.string().describe('Full markdown content of the report'),
+          tldr: z.string().describe('2-3 sentence summary of key findings, used as context for future reports'),
+        }),
+        execute: async ({ type, title, content, tldr }) => {
+          await runMutation(internal.artifacts.saveArtifact, {
+            userId,
+            threadId,
+            type,
+            title,
+            content,
+            tldr,
+            date: new Date().toISOString().split('T')[0],
+          });
+          return `Report "${title}" saved to Insights tab.`;
         },
       }),
     };
@@ -418,6 +440,7 @@ export const sendMessage = action({
       ctx.runMutation.bind(ctx),
       ctx.runQuery.bind(ctx),
       threadId,
+      memData.userId ?? '',
     );
 
     const { thread } = await selectedAgent.continueThread(ctx, { threadId });
@@ -612,6 +635,20 @@ export const insertApiUsage = internalMutation({
       outputTokens,
       createdAt: Date.now(),
     });
+  },
+});
+
+export const getMessagesForDate = internalQuery({
+  args: { threadId: v.string(), date: v.string() },
+  handler: async (ctx, { threadId, date }) => {
+    const startOfDay = new Date(`${date}T00:00:00.000Z`).getTime();
+    const endOfDay = new Date(`${date}T23:59:59.999Z`).getTime();
+    const messages = await ctx.db
+      .query('messages')
+      .withIndex('by_threadId', q => q.eq('threadId', threadId))
+      .order('asc')
+      .collect();
+    return messages.filter(m => m.createdAt >= startOfDay && m.createdAt <= endOfDay);
   },
 });
 

@@ -64,6 +64,7 @@ export default function TabLayout() {
           name="focus"
           options={{ tabBarBadge: hasPendingChallenges ? '!' : undefined }}
         />
+        <Tabs.Screen name="insights" />
         <Tabs.Screen name="settings" />
       </Tabs>
       <ChallengeToastStack toasts={newChallenges} onDismiss={dismissChallenge} />

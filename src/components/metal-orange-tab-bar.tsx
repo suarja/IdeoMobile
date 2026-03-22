@@ -7,7 +7,7 @@ import { Text } from '@/components/ui';
 import colors from '@/components/ui/colors';
 import { haptics } from '@/lib/services/haptics';
 
-const TAB_BAR_WIDTH = 330;
+const TAB_BAR_WIDTH = 360;
 const TAB_BAR_HEIGHT = 72;
 
 type TabConfig = {
@@ -19,6 +19,7 @@ type TabConfig = {
 const TAB_CONFIGS: Record<string, TabConfig> = {
   index: { activeIcon: 'mic', inactiveIcon: 'mic-outline', label: 'Idea' },
   focus: { activeIcon: 'flame', inactiveIcon: 'flame-outline', label: 'Focus' },
+  insights: { activeIcon: 'search', inactiveIcon: 'search-outline', label: 'Insights' },
   settings: { activeIcon: 'person', inactiveIcon: 'person-outline', label: 'Me' },
 };
 

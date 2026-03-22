@@ -105,4 +105,11 @@ crons.cron(
   {},
 );
 
+crons.cron(
+  'generate daily tracking reports',
+  '0 23 * * *',
+  internal.tracking.generateDailyTrackingReports,
+  {},
+);
+
 export default crons;

@@ -26,6 +26,14 @@
     "subtitle": "Press mic · Write",
     "title_placeholder": "New idea…"
   },
+  "insights": {
+    "detail_close": "Close",
+    "empty_suivi": "Your daily tracking reports will appear here.",
+    "empty_validation": "Start a validation conversation to see your reports here.",
+    "segment_suivi": "Tracking",
+    "segment_validation": "Validation",
+    "tab_label": "Insights"
+  },
   "onboarding": {
     "message": "Welcome to obytes app site"
   },
@@ -66,8 +74,11 @@
     "notification_standup": "Daily Standup Reminder",
     "notifications": "Notifications",
     "privacy": "Privacy Policy",
+    "project_links": "Project Links",
     "project_memory_section": "Project",
     "rate": "Rate",
+    "save_links": "Save links",
+    "set_active": "Set Active",
     "share": "Share",
     "social_add": "Add",
     "social_delete_confirm": "Delete this link?",

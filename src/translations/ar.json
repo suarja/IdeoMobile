@@ -26,6 +26,14 @@
     "subtitle": "اضغط وصف ما تريد بناءه",
     "title_placeholder": "فكرة جديدة…"
   },
+  "insights": {
+    "detail_close": "إغلاق",
+    "empty_suivi": "ستظهر تقارير التتبع اليومية هنا.",
+    "empty_validation": "ابدأ محادثة للتحقق من صحة الفكرة لرؤية تقاريرك هنا.",
+    "segment_suivi": "التتبع",
+    "segment_validation": "التحقق",
+    "tab_label": "رؤى"
+  },
   "onboarding": {
     "message": "مرحبا بكم في موقع تطبيق obytes"
   },
@@ -66,8 +74,11 @@
     "notification_standup": "تذكير الوقفة اليومية",
     "notifications": "الإشعارات",
     "privacy": "سياسة الخصوصية",
+    "project_links": "روابط المشروع",
     "project_memory_section": "المشروع",
     "rate": "تقييم",
+    "save_links": "حفظ الروابط",
+    "set_active": "تفعيل",
     "share": "شارك",
     "social_add": "إضافة",
     "social_delete_confirm": "حذف هذا الرابط؟",

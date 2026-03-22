@@ -111,6 +111,12 @@ export default defineSchema({
     status: v.union(v.literal('active'), v.literal('paused'), v.literal('abandoned')),
     createdAt: v.number(),
     validationSearchCount: v.optional(v.number()),
+    projectLinks: v.optional(v.object({
+      github: v.optional(v.string()),
+      website: v.optional(v.string()),
+      tiktok: v.optional(v.string()),
+      instagram: v.optional(v.string()),
+    })),
   })
     .index('by_userId', ['userId'])
     .index('by_threadId', ['threadId'])
@@ -161,6 +167,21 @@ export default defineSchema({
   })
     .index('by_userId', ['userId'])
     .index('by_threadId', ['threadId']),
+
+  // --- Artifacts ---
+
+  artifacts: defineTable({
+    userId: v.string(),
+    threadId: v.optional(v.string()),
+    type: v.union(v.literal('validation'), v.literal('tracking')),
+    title: v.string(),
+    content: v.string(),
+    tldr: v.string(),
+    date: v.string(), // YYYY-MM-DD
+    createdAt: v.number(),
+  })
+    .index('by_user_type', ['userId', 'type'])
+    .index('by_user_date', ['userId', 'date']),
 
   // --- App Config ---
 

@@ -133,7 +133,42 @@ export const listProjects = query({
         status: p.status,
         isActive: p.isActive,
         createdAt: p.createdAt,
+        projectLinks: p.projectLinks ?? null,
       }));
+  },
+});
+
+export const listActiveProjects = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return ctx.db
+      .query('projects')
+      .filter(q => q.eq(q.field('isActive'), true))
+      .collect();
+  },
+});
+
+export const updateProjectLinks = mutation({
+  args: {
+    projectLinks: v.object({
+      github: v.optional(v.string()),
+      website: v.optional(v.string()),
+      tiktok: v.optional(v.string()),
+      instagram: v.optional(v.string()),
+    }),
+  },
+  handler: async (ctx, { projectLinks }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      throw new Error('Unauthenticated');
+    const userId = identity.subject;
+    const project = await ctx.db
+      .query('projects')
+      .withIndex('by_userId_active', q => q.eq('userId', userId).eq('isActive', true))
+      .first();
+    if (!project)
+      throw new Error('No active project');
+    await ctx.db.patch(project._id, { projectLinks });
   },
 });
 
