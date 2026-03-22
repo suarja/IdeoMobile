@@ -9,6 +9,15 @@ On pourrait avoir ce double mouvement :
 Dans un premier temps, rapide, ponctuel, disons, qui pourrait se faire limite dans la conversation, la gente pourrait aller directement vérifier, dire, et ou vérifier où est l'utilisateur dans certains réseaux, dans certains avancements de sites web, par exemple, et ou aussi des recherches un peu plus hebdomadaires, enfin quotidiennes, où l'agent ferait des recherches plus approfondies sur l'état, l'avancement du projet.
 Ce qui donnerait lieu à des jobs asynchrone de workflow aux pages de fonds qui donneraient lieu peut-être à des notifications, des plans, des artefacts, que ce soit de l'ordre des contres-rendus, analyses et des choses comme ça. Mais ils sont peut-être dans un second temps.
 
+
+
+Critère,Score Faible (1),Score Élevé (5)
+Revenu du client cible,Créateurs de contenu sans budget,Entrepreneurs/Managers (B2B)
+Fréquence d'utilisation,Une fois par mois / ponctuel,Usage quotidien
+Alternatives existantes,Marché saturé (ex: IA writing),Gap réel / niche peu servie
+Sophistication technique,Développeurs (peuvent le coder),Artisans/Professions libérales
+Profondeur d'intégration,Session indépendante,Données accumulées (Sticky)
+
 ## Bugs
 
 ### UI

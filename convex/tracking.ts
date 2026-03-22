@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { components, internal } from './_generated/api';
 import { internalAction } from './_generated/server';
-import { webSearch } from './tools/webSearch/index';
+import { scrapeUrl } from './tools/scrape/index';
 
 // ---------------------------------------------------------------------------
 // Tracking agent — one-shot per project, thread stored for observability
@@ -13,8 +13,8 @@ import { webSearch } from './tools/webSearch/index';
 
 const TRACKING_SYSTEM_PROMPT = `You are a daily tracker for vibe coders. Your job is to generate a concise daily stand-up report by:
 1. Reviewing today's conversation activity (provided by the user)
-2. Checking the user's recent TLDRs to avoid redundant searches
-3. Deciding which links (if any) are worth monitoring today — call webSearch 0 to 5 times
+2. Checking the user's recent TLDRs to avoid redundant context
+3. Scraping each available project link using the scrapeUrl tool (one call per link)
 4. Synthesizing everything into a structured markdown report
 5. Calling saveReport with the full report and a 2-3 sentence tldr for tomorrow's context
 
@@ -79,28 +79,30 @@ function buildTrackingPrompt({
 // ---------------------------------------------------------------------------
 
 type RunMutationFn = (ref: any, args: any) => Promise<any>;
+type RunQueryFn = (ref: any, args: any) => Promise<any>;
 
-function buildWebSearchTool(runMutation: RunMutationFn, conversationThreadId: string) {
+type ScrapeToolCtx = {
+  runMutation: RunMutationFn;
+  runQuery: RunQueryFn;
+  userId: string;
+  githubToken: string | undefined;
+};
+
+function buildScrapeUrlTool({ runMutation, runQuery, userId, githubToken }: ScrapeToolCtx) {
   return tool({
-    description: 'Search the web to check a project link or monitor a platform.',
+    description: 'Scrape a project URL to get its current content. Use for each link in "Available Links".',
     inputSchema: z.object({
-      query: z.string().describe('Search query'),
+      url: z.string().describe('Full URL to scrape'),
     }),
-    execute: async ({ query }: { query: string }) => {
-      let results: Array<{ title: string; url: string; content: string }>;
-      try {
-        results = await webSearch(query);
-      }
-      catch (err) {
-        return `Search unavailable: ${err instanceof Error ? err.message : 'Unknown error'}`;
-      }
-      await runMutation(internal.projects.insertWebSearchLog, {
-        threadId: conversationThreadId,
-        specialist: 'tracking',
-        query,
-        resultCount: results.length,
-      });
-      return JSON.stringify(results);
+    execute: async ({ url }: { url: string }) => {
+      const cached = await runQuery(internal.scrapeCache.getCached, { userId, url });
+      if (cached)
+        return `[CACHED] ${cached}`;
+
+      const content = await scrapeUrl(url, githubToken);
+      await runMutation(internal.scrapeCache.setCached, { userId, url, content });
+
+      return content;
     },
   });
 }
@@ -200,7 +202,12 @@ export const generateDailyTrackingReports = internalAction({
       await thread.generateText({
         prompt,
         tools: {
-          webSearch: buildWebSearchTool(ctx.runMutation.bind(ctx), project.threadId),
+          scrapeUrl: buildScrapeUrlTool({
+            runMutation: ctx.runMutation.bind(ctx),
+            runQuery: ctx.runQuery.bind(ctx),
+            userId: project.userId,
+            githubToken: profile?.githubToken,
+          }),
           saveReport: buildSaveReportTool(ctx.runMutation.bind(ctx), project.userId, trackingThreadId),
         },
       });
