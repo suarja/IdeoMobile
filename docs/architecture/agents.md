@@ -348,6 +348,64 @@ function truncateAtMarkerPrefix(text: string): string {
 
 ---
 
+## Patterns Convex — anti-patterns & bonnes pratiques
+
+### Thread persistant par agent (2026-03-22)
+
+**Contexte :** le tracking cron créait un nouveau thread à chaque run → mémoire perdue, historique dispersé, impossible à monitorer.
+
+**Pattern correct : thread persistant par projet, `continueThread` à chaque run.**
+
+```typescript
+// ✅ BON — thread créé une fois, persisté, repris à chaque run
+let trackingThreadId = project.trackingThreadId;
+if (!trackingThreadId) {
+  const { threadId } = await trackingAgent.createThread(ctx, {});
+  trackingThreadId = threadId;
+  await ctx.runMutation(internal.projects.setTrackingThreadId, {
+    projectId: project._id,
+    trackingThreadId,
+  });
+}
+const { thread } = await trackingAgent.continueThread(ctx, { threadId: trackingThreadId });
+await thread.generateText({ prompt, tools });
+
+// ❌ ANTI-PATTERN — nouveau thread à chaque run = zéro mémoire
+const { thread } = await trackingAgent.createThread(ctx, {});
+await thread.generateText({ prompt, tools });
+```
+
+**Bénéfices :**
+- L'agent voit tout son historique nativement — pas besoin d'injecter des TLDRs manuellement
+- Le thread est visible dans le Convex Dashboard Agents Playground avec tous les tool calls et payloads
+- Le threadId persisté en DB permet la supervision et le debug directement depuis le dashboard
+
+### `maxSteps` — sur la définition de l'agent, pas dans l'appel
+
+```typescript
+// ✅ BON — déclaré sur la définition
+export const trackingAgent = new Agent(components.agent, {
+  name: 'Tracking Agent',
+  languageModel: anthropic('claude-sonnet-4-6'),
+  instructions: TRACKING_SYSTEM_PROMPT,
+  maxSteps: 10,  // ← ici
+});
+
+// ❌ ANTI-PATTERN — déclaré comme stopWhen dans l'appel (l'AI SDK l'accepte mais c'est hors pattern codebase)
+await thread.generateText({ prompt, stopWhen: stepCountIs(6) });
+```
+
+### Convex Dashboard Agents Playground — outil de debug primaire
+
+Le playground permet de :
+- Voir chaque thread avec ses messages, tool calls, et payloads complets
+- Identifier les erreurs d'un step spécifique (ex: webSearch qui retourne vide)
+- Rejouer une requête manuellement pour tester
+
+→ Toujours stocker les `threadId` en DB (`trackingThreadId`, `threadId`) pour pouvoir retrouver le thread dans le playground.
+
+---
+
 ## Points d'attention
 
 1. **Fallback router :** si le routeur Haiku échoue (réseau, parsing JSON), le fallback est `generalAgent` avec le message original. Le user ne voit aucune différence.
