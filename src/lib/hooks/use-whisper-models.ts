@@ -5,6 +5,7 @@
  */
 import type { DownloadProgressData, FileSystemDownloadResult } from 'expo-file-system/legacy';
 import type { WhisperContext } from 'whisper.rn/index.js';
+import type { TxKeyPath } from '@/lib/i18n';
 import { Directory, File, Paths } from 'expo-file-system';
 import {
   createDownloadResumable,
@@ -17,42 +18,27 @@ const SELECTED_MODEL_KEY = 'whisper_selected_model';
 
 export type WhisperModel = {
   id: string;
-  label: string;
+  /** i18n key used with translate() — e.g. 'settings.model_precise' */
+  labelKey: TxKeyPath;
   url: string;
   filename: string;
+  /** Approximate compressed file size in bytes — shown before download. */
+  sizeBytes: number;
   capabilities: {
     multilingual: boolean;
     quantizable: boolean;
-    tdrz?: boolean; // Optional TDRZ capability for native models
   };
 };
 
+// Models ordered from best to lightest.
+// Sizes are the actual file sizes on HuggingFace (whisper.cpp ggml builds).
 export const WHISPER_MODELS: WhisperModel[] = [
   {
     id: 'large-v3-turbo',
-    label: 'Large Multilanguae',
+    labelKey: 'settings.model_precise',
     url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin',
     filename: 'ggml-large-v3-turbo.bin',
-    capabilities: {
-      multilingual: true,
-      quantizable: false,
-    },
-  },
-  {
-    id: 'tiny',
-    label: 'Tiny (en)',
-    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin',
-    filename: 'ggml-tiny.en.bin',
-    capabilities: {
-      multilingual: false,
-      quantizable: false,
-    },
-  },
-  {
-    id: 'base',
-    label: 'Base Model',
-    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin',
-    filename: 'ggml-base.bin',
+    sizeBytes: 809_000_000, // ~809 MB
     capabilities: {
       multilingual: true,
       quantizable: false,
@@ -60,23 +46,35 @@ export const WHISPER_MODELS: WhisperModel[] = [
   },
   {
     id: 'small',
-    label: 'Small Model',
+    labelKey: 'settings.model_balanced',
     url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin',
     filename: 'ggml-small.bin',
+    sizeBytes: 487_000_000, // ~487 MB
     capabilities: {
       multilingual: true,
       quantizable: false,
     },
   },
   {
-    id: 'small-tdrz',
-    label: 'Small (tdrz)',
-    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en-tdrz.bin',
-    filename: 'ggml-small.en-tdrz.bin',
+    id: 'base',
+    labelKey: 'settings.model_lightweight',
+    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin',
+    filename: 'ggml-base.bin',
+    sizeBytes: 148_000_000, // ~148 MB
+    capabilities: {
+      multilingual: true,
+      quantizable: false,
+    },
+  },
+  {
+    id: 'tiny',
+    labelKey: 'settings.model_minimal',
+    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin',
+    filename: 'ggml-tiny.en.bin',
+    sizeBytes: 77_700_000, // ~78 MB
     capabilities: {
       multilingual: false,
       quantizable: false,
-      tdrz: true,
     },
   },
 ];
@@ -101,6 +99,10 @@ export function useWhisperModels() {
   );
   const [vadContext, setVadContext] = useState<any>(null);
   const [currentModelId, setCurrentModelId] = useState<string | null>(null);
+
+  // Throttle download progress setState calls: only emit when progress changes by ≥1%
+  // to avoid "Maximum update depth exceeded" at high download speeds.
+  const lastEmittedProgressRef = useRef<Record<string, number>>({});
 
   // Refs always pointing to the latest contexts — used for cleanup on unmount (Fast Refresh,
   // app teardown) to release native Whisper objects and avoid TurboModuleManager timeout.
@@ -204,15 +206,19 @@ export function useWhisperModels() {
               = totalBytesExpectedToWrite > 0
                 ? totalBytesWritten / totalBytesExpectedToWrite
                 : 0;
-            setDownloadProgress(prev => ({
-              ...prev,
-              [model.id]: fraction,
-            }));
-            console.log(
-              `Download progress for ${model.id}: ${(fraction * 100).toFixed(
-                1,
-              )}%`,
-            );
+            const last = lastEmittedProgressRef.current[model.id] ?? -1;
+            if (fraction - last >= 0.01 || fraction === 1) {
+              lastEmittedProgressRef.current[model.id] = fraction;
+              setDownloadProgress(prev => ({
+                ...prev,
+                [model.id]: fraction,
+              }));
+              console.log(
+                `Download progress for ${model.id}: ${(fraction * 100).toFixed(
+                  1,
+                )}%`,
+              );
+            }
           },
         );
 
@@ -228,6 +234,7 @@ export function useWhisperModels() {
           console.log(`Successfully downloaded model ${model.id}`);
           updateModelFileInfo();
           setDownloadProgress(prev => ({ ...prev, [model.id]: 1 }));
+          delete lastEmittedProgressRef.current[model.id];
           return file.uri;
         }
         else {
@@ -255,7 +262,7 @@ export function useWhisperModels() {
 
       try {
         setIsInitializingModel(true);
-        console.log(`Initializing Whisper model: ${model.label}`);
+        console.log(`Initializing Whisper model: ${model.labelKey}`);
 
         // Download model if not already available
         const modelPath = await downloadModel(model);
@@ -268,7 +275,7 @@ export function useWhisperModels() {
         setWhisperContext(context);
         setCurrentModelId(modelId);
         storage.set(SELECTED_MODEL_KEY, modelId);
-        console.log(`Whisper context initialized for model: ${model.label}`);
+        console.log(`Whisper context initialized for model: ${model.labelKey}`);
 
         // Optionally initialize VAD context
         let vad: any = null;

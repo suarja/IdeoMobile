@@ -1,5 +1,6 @@
 import { useModal } from '@/components/ui/modal';
 import { useWhisperModels, WHISPER_MODELS } from '@/lib/hooks/use-whisper-models';
+import { translate } from '@/lib/i18n';
 
 import { SettingsItem } from './settings-item';
 import { WhisperModelBottomSheet } from './whisper-model-bottom-sheet';
@@ -24,7 +25,7 @@ export function WhisperModelItem() {
     <>
       <SettingsItem
         text="settings.voice_model"
-        value={activeModel?.label ?? '—'}
+        value={activeModel ? translate(activeModel.labelKey) : '—'}
         onPress={modal.present}
       />
       <WhisperModelBottomSheet

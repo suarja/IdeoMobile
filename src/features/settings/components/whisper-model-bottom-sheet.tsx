@@ -122,16 +122,21 @@ function ModelRow({ model, isLast, isActive, downloaded, fileSize, progress, isT
       <View style={styles.rowInner}>
         <View style={styles.rowInfo}>
           <View style={styles.rowNameRow}>
+            <Text style={styles.modelName}>{translate(model.labelKey)}</Text>
             {isActive && (
               <View style={styles.activeBadge}>
-                <Text style={styles.activeBadgeText}>Active</Text>
+                <Text style={styles.activeBadgeText}>{translate('settings.active_badge')}</Text>
               </View>
             )}
-            <Text style={styles.modelName}>{model.label}</Text>
           </View>
           <Text style={styles.modelMeta}>
-            {model.capabilities.multilingual ? 'Multilingual' : 'English only'}
-            {fileSize ? `  ·  ${formatBytes(fileSize)}` : ''}
+            {translate(model.capabilities.multilingual ? 'settings.model_multilingual' : 'settings.model_english_only')}
+            {'  ·  '}
+            {fileSize
+              ? formatBytes(fileSize)
+              : model.sizeBytes
+                ? `~${formatBytes(model.sizeBytes)}`
+                : ''}
           </Text>
           {isThisDownloading && (
             <View style={styles.progressTrack}>
@@ -285,10 +290,10 @@ const styles = StyleSheet.create({
     height: 1,
     marginHorizontal: 4,
   },
-  // Active badge
+  // Active badge — small element (~14px tall), radius 4 keeps the "carré raffiné" feel
   activeBadge: {
     backgroundColor: colors.brand.dark,
-    borderRadius: RADIUS,
+    borderRadius: 4,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
