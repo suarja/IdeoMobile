@@ -1,13 +1,14 @@
 import { anthropic } from '@ai-sdk/anthropic';
-import { generateText, stepCountIs, tool } from 'ai';
+import { Agent } from '@convex-dev/agent';
+import { tool } from 'ai';
 import { z } from 'zod';
 
-import { internal } from './_generated/api';
+import { components, internal } from './_generated/api';
 import { internalAction } from './_generated/server';
 import { webSearch } from './tools/webSearch/index';
 
 // ---------------------------------------------------------------------------
-// System prompt for the tracking agent
+// Tracking agent — one-shot per project, thread stored for observability
 // ---------------------------------------------------------------------------
 
 const TRACKING_SYSTEM_PROMPT = `You are a daily tracker for vibe coders. Your job is to generate a concise daily stand-up report by:
@@ -19,23 +20,27 @@ const TRACKING_SYSTEM_PROMPT = `You are a daily tracker for vibe coders. Your jo
 
 Be concise and actionable. Focus on what changed today vs previous reports.`;
 
+export const trackingAgent = new Agent(components.agent, {
+  name: 'Tracking Agent',
+  languageModel: anthropic('claude-sonnet-4-6'),
+  instructions: TRACKING_SYSTEM_PROMPT,
+  maxSteps: 10,
+});
+
 // ---------------------------------------------------------------------------
 // Prompt builder
 // ---------------------------------------------------------------------------
 
 type TrackingMessage = { role: 'user' | 'assistant'; content: string; createdAt: number };
-type RecentTldr = { date: string; tldr: string };
 
 function buildTrackingPrompt({
   projectName,
   todayMessages,
-  recentTldrs,
   availableLinks,
   today,
 }: {
   projectName: string;
   todayMessages: TrackingMessage[];
-  recentTldrs: RecentTldr[];
   availableLinks: Record<string, string>;
   today: string;
 }): string {
@@ -44,14 +49,6 @@ function buildTrackingPrompt({
     `**Project:** ${projectName}`,
     '',
   ];
-
-  if (recentTldrs.length > 0) {
-    lines.push('## Recent Reports (memory)');
-    for (const tldr of recentTldrs) {
-      lines.push(`- **${tldr.date}:** ${tldr.tldr}`);
-    }
-    lines.push('');
-  }
 
   if (Object.keys(availableLinks).length > 0) {
     lines.push('## Available Links to Monitor');
@@ -83,7 +80,7 @@ function buildTrackingPrompt({
 
 type RunMutationFn = (ref: any, args: any) => Promise<any>;
 
-function buildWebSearchTool(runMutation: RunMutationFn, threadId: string) {
+function buildWebSearchTool(runMutation: RunMutationFn, conversationThreadId: string) {
   return tool({
     description: 'Search the web to check a project link or monitor a platform.',
     inputSchema: z.object({
@@ -98,7 +95,7 @@ function buildWebSearchTool(runMutation: RunMutationFn, threadId: string) {
         return `Search unavailable: ${err instanceof Error ? err.message : 'Unknown error'}`;
       }
       await runMutation(internal.projects.insertWebSearchLog, {
-        threadId,
+        threadId: conversationThreadId,
         specialist: 'tracking',
         query,
         resultCount: results.length,
@@ -108,7 +105,7 @@ function buildWebSearchTool(runMutation: RunMutationFn, threadId: string) {
   });
 }
 
-function buildSaveReportTool(runMutation: RunMutationFn, userId: string, threadId: string) {
+function buildSaveReportTool(runMutation: RunMutationFn, userId: string, trackingThreadId: string) {
   return tool({
     description: 'Save the completed daily tracking report as a persistent artifact visible in the Insights tab.',
     inputSchema: z.object({
@@ -120,7 +117,7 @@ function buildSaveReportTool(runMutation: RunMutationFn, userId: string, threadI
       const date = new Date().toISOString().split('T')[0];
       await runMutation(internal.artifacts.saveArtifact, {
         userId,
-        threadId,
+        threadId: trackingThreadId,
         type: 'tracking' as const,
         title,
         content,
@@ -151,15 +148,10 @@ export const generateDailyTrackingReports = internalAction({
       if (existing)
         continue;
 
-      const [todayMessages, recentTldrs, profile] = await Promise.all([
+      const [todayMessages, profile] = await Promise.all([
         ctx.runQuery(internal.chat.getMessagesForDate, {
           threadId: project.threadId,
           date: today,
-        }),
-        ctx.runQuery(internal.artifacts.getRecentTldrs, {
-          userId: project.userId,
-          type: 'tracking' as const,
-          limit: 3,
         }),
         ctx.runQuery(internal.userProfiles.getProfileByUserId, {
           userId: project.userId,
@@ -188,19 +180,28 @@ export const generateDailyTrackingReports = internalAction({
       const prompt = buildTrackingPrompt({
         projectName: project.name ?? 'Unnamed project',
         todayMessages: todayMessages as TrackingMessage[],
-        recentTldrs,
         availableLinks,
         today,
       });
 
-      await generateText({
-        model: anthropic('claude-sonnet-4-6'),
-        system: TRACKING_SYSTEM_PROMPT,
+      // Ensure persistent tracking thread for this project
+      let trackingThreadId = project.trackingThreadId;
+      if (!trackingThreadId) {
+        const { threadId } = await trackingAgent.createThread(ctx, {});
+        trackingThreadId = threadId;
+        await ctx.runMutation(internal.projects.setTrackingThreadId, {
+          projectId: project._id,
+          trackingThreadId,
+        });
+      }
+
+      // Continue the same thread every run — agent has native memory
+      const { thread } = await trackingAgent.continueThread(ctx, { threadId: trackingThreadId });
+      await thread.generateText({
         prompt,
-        stopWhen: stepCountIs(6), // up to 5 web searches + 1 saveReport
         tools: {
           webSearch: buildWebSearchTool(ctx.runMutation.bind(ctx), project.threadId),
-          saveReport: buildSaveReportTool(ctx.runMutation.bind(ctx), project.userId, project.threadId),
+          saveReport: buildSaveReportTool(ctx.runMutation.bind(ctx), project.userId, trackingThreadId),
         },
       });
     }

@@ -111,6 +111,7 @@ export default defineSchema({
     status: v.union(v.literal('active'), v.literal('paused'), v.literal('abandoned')),
     createdAt: v.number(),
     validationSearchCount: v.optional(v.number()),
+    trackingThreadId: v.optional(v.string()), // thread persistant pour le tracking cron
     projectLinks: v.optional(v.object({
       github: v.optional(v.string()),
       website: v.optional(v.string()),

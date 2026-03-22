@@ -148,6 +148,13 @@ export const listActiveProjects = internalQuery({
   },
 });
 
+export const setTrackingThreadId = internalMutation({
+  args: { projectId: v.id('projects'), trackingThreadId: v.string() },
+  handler: async (ctx, { projectId, trackingThreadId }) => {
+    await ctx.db.patch(projectId, { trackingThreadId });
+  },
+});
+
 export const updateProjectLinks = mutation({
   args: {
     projectLinks: v.object({
