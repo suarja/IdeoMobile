@@ -96,6 +96,81 @@ Avec 10 projets actifs = 30 appels max → bien dans les 60/h sans token, largem
 
 ---
 
+## Branches — angle mort actuel et solution
+
+### Le problème
+
+L'implémentation actuelle (`/commits?per_page=5` sans paramètre `sha`) ne lit que la branche **default** du repo (`main` ou `master`). Un développeur qui travaille exclusivement sur des branches feature (cas très courant chez les vibe coders) sera affiché comme **inactif** même s'il commite tous les jours.
+
+Exemple concret : ce projet est sur `feat/web-search` — `/commits` sans `sha=` retourne les commits de `main`, qui peut ne pas avoir bougé depuis des semaines.
+
+### Ce que l'API offre pour les branches
+
+| Endpoint | Ce qu'il retourne | Coût |
+|----------|-------------------|------|
+| `GET /repos/{owner}/{repo}/branches` | Liste de toutes les branches avec le SHA du dernier commit | 1 appel |
+| `GET /repos/{owner}/{repo}/branches/{branch}` | Détail d'une branche : dernier commit + date | 1 appel |
+| `GET /repos/{owner}/{repo}/commits?sha={branch}&per_page=5` | Commits d'une branche spécifique | 1 appel par branche |
+| `GET /repos/{owner}/{repo}/events?per_page=30` | Flux d'événements : PushEvent contient `ref` (nom de branche) + commits | 1 appel, tout dedans |
+
+### Limitation : `/branches` ne donne pas directement les dates
+
+`/branches` retourne le SHA du dernier commit mais **pas sa date**. Pour avoir la date il faut soit :
+- Appeler `/commits/{sha}` pour chaque branche → N+1 appels (coûteux)
+- Utiliser `/events` → **la meilleure approche**
+
+### Solution recommandée : Events API
+
+`GET /repos/{owner}/{repo}/events?per_page=30`
+
+Retourne les 30 derniers événements, ordonnés du plus récent au plus ancien. Un `PushEvent` contient :
+
+```json
+{
+  "type": "PushEvent",
+  "created_at": "2026-03-23T14:22:00Z",
+  "ref": "refs/heads/feat/web-search",
+  "payload": {
+    "commits": [
+      { "message": "feat(tracking): scrapeUrl tool", "sha": "abc123" }
+    ]
+  }
+}
+```
+
+Avec **un seul appel** on obtient :
+- Les **2-3 branches les plus récemment poussées** (filtrer les PushEvents)
+- Le **commit le plus récent** toutes branches confondues
+- La **date réelle de la dernière activité** (pas celle de `main`)
+
+Limite : historique de 90 événements max, pas de pagination au-delà. Pour un suivi quotidien c'est largement suffisant.
+
+### Workflow branches recommandé (à implémenter)
+
+```
+1. GET /repos/{owner}/{repo}           → pushed_at (date la plus récente, toutes branches)
+2. GET /repos/{owner}/{repo}/events    → PushEvents → branches actives + commits récents
+3. Afficher dans le rapport :
+   - Branche la plus récente : feat/web-search (poussée il y a 2h)
+   - Commits récents sur cette branche : ...
+   - Main : pas bougé depuis X jours (info contextuelle)
+```
+
+**Total : 2 appels au lieu de 2, mais avec une couverture réelle de l'activité.**
+
+### Bug actuel dans `github.ts`
+
+```typescript
+// ❌ Ne lit que main/master
+fetch(`/repos/${owner}/${repo}/commits?per_page=5`, { headers })
+
+// ✅ Ce qu'il faudrait faire
+fetch(`/repos/${owner}/${repo}/events?per_page=30`, { headers })
+// puis filtrer type === 'PushEvent' et extraire ref + commits
+```
+
+---
+
 ## Évolution possible : GitHub Events API
 
 `GET /repos/{owner}/{repo}/events` — flux d'événements bruts (push, fork, star, issue, PR).
