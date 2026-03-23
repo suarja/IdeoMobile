@@ -59,7 +59,11 @@ En plus des repos publics :
 
 ## Workflow de tracking GitHub recommandé
 
-### Pour chaque projet actif avec un lien GitHub
+### Pour chaque projet avec `isTracked: true`
+
+> **Note :** Le cron `generateDailyTrackingReports` itère sur les projets où `isTracked: true` (flag système, pas exposé à l'utilisateur). Le flag `isActive` (UI) et `isTracked` (cron) sont indépendants — un projet peut être suivi sans être le projet actif courant, et vice versa.
+>
+> L'idempotency est désormais **par projet par jour** (index `by_project_date`). Plusieurs projets `isTracked` peuvent donc recevoir leur rapport le même jour sans se bloquer mutuellement.
 
 **1 appel principal** (`/repos/{owner}/{repo}`) — toujours :
 ```
@@ -201,5 +205,11 @@ Les réseaux sociaux (TikTok/Instagram) restent V2 via Apify — utiles pour la 
 convex/tools/scrape/github.ts    — githubFetch() — implémenté
 convex/github.ts                 — action validateGitHubToken — implémenté
 convex/tracking.ts               — scrapeUrl tool (appelle githubFetch si URL github.com)
+                                   buildSaveReportTool — sauvegarde l'artifact avec projectId
+                                   generateDailyTrackingReports — itère sur listTrackedProjects
 convex/tools/scrape/index.ts     — dispatcher URL → githubFetch ou firecrawlScrape
+convex/projects.ts               — listTrackedProjects (internalQuery), setIsTracked (mutation)
+convex/artifacts.ts              — getTrackingArtifactForDate — idempotency per-project via by_project_date
+convex/schema.ts                 — projects.isTracked (v.optional(v.boolean()))
+                                   artifacts index by_project_date (['projectId', 'date'])
 ```
