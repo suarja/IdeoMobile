@@ -8,7 +8,13 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { internalAction } from './_generated/server';
 import { firecrawlScrape } from './tools/scrape/firecrawl';
-import { githubFetch } from './tools/scrape/github';
+import {
+  getActiveBranches,
+  getCommitsByBranch,
+  getOpenPRs,
+  getRepoStats,
+  githubFetch,
+} from './tools/scrape/github';
 import { scrapeUrl } from './tools/scrape/index';
 import { webSearch } from './tools/webSearch/index';
 
@@ -143,6 +149,108 @@ export const testGitHubEvents = internalAction({
       }));
 
     return { owner, repo, pushEventCount: pushEvents.length, events: pushEvents };
+  },
+});
+
+/**
+ * Test getRepoStats primitive directly.
+ *
+ * Usage — Convex Dashboard > Functions > debug:testGetRepoStats
+ *   args: { "owner": "suarja", "repo": "IdeoMobile" }
+ */
+export const testGetRepoStats = internalAction({
+  args: {
+    owner: v.string(),
+    repo: v.string(),
+    token: v.optional(v.string()),
+  },
+  handler: async (_ctx, { owner, repo, token }) => {
+    let stats = null;
+    let error: string | null = null;
+    try {
+      stats = await getRepoStats(owner, repo, token);
+    }
+    catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    }
+    return { owner, repo, stats, error };
+  },
+});
+
+/**
+ * Test getActiveBranches primitive directly.
+ *
+ * Usage — Convex Dashboard > Functions > debug:testGetActiveBranches
+ *   args: { "owner": "suarja", "repo": "IdeoMobile" }
+ */
+export const testGetActiveBranches = internalAction({
+  args: {
+    owner: v.string(),
+    repo: v.string(),
+    token: v.optional(v.string()),
+  },
+  handler: async (_ctx, { owner, repo, token }) => {
+    let branches: Awaited<ReturnType<typeof getActiveBranches>> = [];
+    let error: string | null = null;
+    try {
+      branches = await getActiveBranches(owner, repo, token);
+    }
+    catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    }
+    return { owner, repo, branchCount: branches.length, branches, error };
+  },
+});
+
+/**
+ * Test getCommitsByBranch primitive directly.
+ *
+ * Usage — Convex Dashboard > Functions > debug:testGetCommitsByBranch
+ *   args: { "owner": "suarja", "repo": "IdeoMobile", "branch": "main", "limit": 5 }
+ */
+export const testGetCommitsByBranch = internalAction({
+  args: {
+    owner: v.string(),
+    repo: v.string(),
+    branch: v.string(),
+    token: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (_ctx, { owner, repo, branch, token, limit }) => {
+    let commits: Awaited<ReturnType<typeof getCommitsByBranch>> = [];
+    let error: string | null = null;
+    try {
+      commits = await getCommitsByBranch({ owner, repo, branch, token, limit });
+    }
+    catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    }
+    return { owner, repo, branch, commitCount: commits.length, commits, error };
+  },
+});
+
+/**
+ * Test getOpenPRs primitive directly.
+ *
+ * Usage — Convex Dashboard > Functions > debug:testGetOpenPRs
+ *   args: { "owner": "suarja", "repo": "IdeoMobile" }
+ */
+export const testGetOpenPRs = internalAction({
+  args: {
+    owner: v.string(),
+    repo: v.string(),
+    token: v.optional(v.string()),
+  },
+  handler: async (_ctx, { owner, repo, token }) => {
+    let prs: Awaited<ReturnType<typeof getOpenPRs>> = [];
+    let error: string | null = null;
+    try {
+      prs = await getOpenPRs(owner, repo, token);
+    }
+    catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    }
+    return { owner, repo, prCount: prs.length, prs, error };
   },
 });
 

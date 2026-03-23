@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { components, internal } from './_generated/api';
 import { internalAction } from './_generated/server';
+import { getCommitsByBranch, parseOwnerRepo } from './tools/scrape/github';
 import { scrapeUrl } from './tools/scrape/index';
 
 // ---------------------------------------------------------------------------
@@ -17,6 +18,7 @@ const TRACKING_SYSTEM_PROMPT = `You are a GitHub-focused daily tracker for vibe 
 Your job:
 1. Call scrapeUrl with the GitHub URL provided in "GitHub Repository" — this returns repo stats, active branches, and recent commits via the GitHub Events API
 2. Identify the most recently active branch (not necessarily main)
+2b. If you need more commits from a specific branch (after identifying it via scrapeUrl), call getGitHubCommits with the branch name.
 3. Summarize what changed since the last report (commits, new branches, open issues trend, stars)
 4. Flag any risks: no commits in 7+ days, spike in open issues, branch divergence from main
 5. Call saveReport with the full structured report and a 2-3 sentence tldr for tomorrow's context
@@ -126,6 +128,41 @@ type SaveReportToolCtx = {
   projectId?: Id<'projects'>;
 };
 
+type GetGitHubCommitsToolCtx = {
+  runMutation: RunMutationFn;
+  runQuery: RunQueryFn;
+  userId: string;
+  githubUrl: string;
+  owner: string;
+  repo: string;
+  githubToken: string | undefined;
+};
+
+function buildGetGitHubCommitsTool({ runMutation, runQuery, userId, githubUrl, owner, repo, githubToken }: GetGitHubCommitsToolCtx) {
+  return tool({
+    description: 'Get recent commits from a specific branch. Use after scrapeUrl identifies the most active branch to get more detail.',
+    inputSchema: z.object({
+      branch: z.string().describe('Branch name (e.g. "main", "feat/web-search")'),
+      limit: z.number().optional().describe('Number of commits (default: 5)'),
+    }),
+    execute: async ({ branch, limit = 5 }: { branch: string; limit?: number }) => {
+      const cacheKey = `${githubUrl}#commits/${branch}`;
+
+      const cached = await runQuery(internal.scrapeCache.getCached, { userId, url: cacheKey });
+      if (cached)
+        return `[CACHED] ${cached}`;
+
+      const commits = await getCommitsByBranch({ owner, repo, branch, token: githubToken, limit });
+      const content = commits.length === 0
+        ? `No commits found for branch "${branch}"`
+        : commits.map(c => `- ${c.sha}: ${c.message}`).join('\n');
+
+      await runMutation(internal.scrapeCache.setCached, { userId, url: cacheKey, content });
+      return content;
+    },
+  });
+}
+
 function buildSaveReportTool({ runMutation, userId, trackingThreadId, projectId }: SaveReportToolCtx) {
   return tool({
     description: 'Save the completed daily tracking report as a persistent artifact visible in the Insights tab.',
@@ -195,6 +232,13 @@ export const generateDailyTrackingReports = internalAction({
         continue;
       }
 
+      const parsedRepo = parseOwnerRepo(githubUrl);
+      if (!parsedRepo) {
+        console.log(`[tracking] Skipping project ${project._id}: cannot parse GitHub URL "${githubUrl}"`);
+        continue;
+      }
+      const [owner, repo] = parsedRepo;
+
       const recentTldrs = recentTldrEntries.map((e: { date: string; tldr: string }) => `[${e.date}] ${e.tldr}`);
 
       const prompt = buildTrackingPrompt({
@@ -224,6 +268,15 @@ export const generateDailyTrackingReports = internalAction({
             runMutation: ctx.runMutation.bind(ctx),
             runQuery: ctx.runQuery.bind(ctx),
             userId: project.userId,
+            githubToken,
+          }),
+          getGitHubCommits: buildGetGitHubCommitsTool({
+            runMutation: ctx.runMutation.bind(ctx),
+            runQuery: ctx.runQuery.bind(ctx),
+            userId: project.userId,
+            githubUrl,
+            owner,
+            repo,
             githubToken,
           }),
           saveReport: buildSaveReportTool({ runMutation: ctx.runMutation.bind(ctx), userId: project.userId, trackingThreadId, projectId: project._id }),
