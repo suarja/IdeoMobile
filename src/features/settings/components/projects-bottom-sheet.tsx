@@ -1,7 +1,8 @@
 import type { Id } from '../../../../convex/_generated/dataModel';
 
+import { Ionicons } from '@expo/vector-icons';
 import * as React from 'react';
-import { Alert, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
 import { colors, Text } from '@/components/ui';
 import { Modal, useModal } from '@/components/ui/modal';
 import { useListProjects, useSetActiveProject } from '@/features/focus/api';
@@ -67,18 +68,14 @@ const SEPARATOR_STYLE = {
 
 type ExpandedFormProps = {
   projectId: Id<'projects'>;
-  isActive: boolean;
   initialName: string;
   initialLinks: ProjectLinks;
-  onSetActive: () => void;
   onSave: (name: string, links: ProjectLinks) => Promise<void>;
 };
 
 function ProjectExpandedForm({
-  isActive,
   initialName,
   initialLinks,
-  onSetActive,
   onSave,
 }: ExpandedFormProps) {
   const [localName, setLocalName] = React.useState(initialName);
@@ -147,23 +144,6 @@ function ProjectExpandedForm({
       ))}
 
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-        {!isActive && (
-          <TouchableOpacity
-            onPress={onSetActive}
-            style={{
-              flex: 1,
-              paddingVertical: 10,
-              borderRadius: 10,
-              borderWidth: 1,
-              borderColor: colors.brand.dark,
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ fontSize: 13, fontWeight: '600', color: colors.brand.dark }}>
-              {translate('settings.set_active')}
-            </Text>
-          </TouchableOpacity>
-        )}
         <TouchableOpacity
           onPress={() => void handleSave()}
           disabled={saving}
@@ -224,18 +204,40 @@ function ProjectRow({ project, isExpanded, onToggle, onSetActive, onSave }: Proj
             {new Date(project.createdAt).toLocaleDateString()}
           </Text>
         </View>
-        <Text style={{ fontSize: 18, color: colors.brand.muted, marginLeft: 8 }}>
-          {isExpanded ? '−' : '+'}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          {!project.isActive && (
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                onSetActive();
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 6,
+                borderWidth: 1,
+                borderColor: colors.brand.dark,
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '600', color: colors.brand.dark }}>
+                {translate('settings.set_active')}
+              </Text>
+            </TouchableOpacity>
+          )}
+          <Ionicons
+            name={isExpanded ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={colors.brand.muted}
+          />
+        </View>
       </TouchableOpacity>
 
       {isExpanded && (
         <ProjectExpandedForm
           projectId={project.projectId}
-          isActive={project.isActive}
           initialName={project.name ?? ''}
           initialLinks={fromProjectLinks(project.projectLinks)}
-          onSetActive={onSetActive}
           onSave={onSave}
         />
       )}
@@ -283,13 +285,13 @@ function NewProjectRow({ onCreated }: NewProjectRowProps) {
         activeOpacity={0.7}
       >
         <Text style={{ fontSize: 14, fontWeight: '600', color: colors.brand.dark }}>
-          +
-          {' '}
           {translate('settings.new_project_button')}
         </Text>
-        <Text style={{ fontSize: 18, color: colors.brand.muted }}>
-          {expanded ? '−' : '+'}
-        </Text>
+        <Ionicons
+          name={expanded ? 'chevron-up' : 'chevron-down'}
+          size={18}
+          color={colors.brand.muted}
+        />
       </TouchableOpacity>
 
       {expanded && (
@@ -383,7 +385,7 @@ export function ProjectsItem() {
             {translate('settings.agent_projects')}
           </Text>
         </View>
-        <View>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
           <NewProjectRow onCreated={() => setExpandedId(null)} />
           <View style={SEPARATOR_STYLE} />
           {(projects ?? []).map((project, idx) => (
@@ -400,7 +402,7 @@ export function ProjectsItem() {
               )}
             </View>
           ))}
-        </View>
+        </ScrollView>
       </Modal>
     </>
   );
