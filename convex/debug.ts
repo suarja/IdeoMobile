@@ -5,6 +5,7 @@
 
 import { v } from 'convex/values';
 
+import { internal } from './_generated/api';
 import { internalAction } from './_generated/server';
 import { firecrawlScrape } from './tools/scrape/firecrawl';
 import { githubFetch } from './tools/scrape/github';
@@ -92,5 +93,113 @@ export const testGitHub = internalAction({
   handler: async (_ctx, { url, token }) => {
     const content = await githubFetch(url, token);
     return { url, content };
+  },
+});
+
+/**
+ * Inspect raw GitHub Events API (PushEvents) for a repo.
+ * Useful for verifying branch names, dates, and commit messages before the
+ * tracking agent processes them.
+ *
+ * Usage — Convex Dashboard > Functions > debug:testGitHubEvents
+ *   args: { "url": "https://github.com/owner/repo", "token": "ghp_..." }
+ */
+export const testGitHubEvents = internalAction({
+  args: {
+    url: v.string(),
+    token: v.optional(v.string()),
+  },
+  handler: async (_ctx, { url, token }) => {
+    const match = url.match(/github\.com\/([^/]+)\/([^/\s?#]+)/);
+    if (!match)
+      return { error: `Cannot parse GitHub URL: ${url}`, events: [] };
+    const [, owner, repo] = match;
+
+    const headers: Record<string, string> = { Accept: 'application/vnd.github.v3+json' };
+    if (token)
+      headers.Authorization = `Bearer ${token}`;
+
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/events?per_page=30`, { headers });
+    if (!res.ok)
+      return { error: `GitHub API error ${res.status}`, events: [] };
+
+    type RawEvent = {
+      type: string;
+      created_at: string;
+      payload: { ref: string; commits: Array<{ message: string; sha: string }> };
+    };
+
+    const events = await res.json() as RawEvent[];
+    const pushEvents = events
+      .filter((e: RawEvent) => e.type === 'PushEvent' && e.payload.ref)
+      .slice(0, 10)
+      .map((e: RawEvent) => ({
+        branch: e.payload.ref.replace('refs/heads/', ''),
+        created_at: e.created_at,
+        commits: (e.payload.commits ?? []).slice(0, 3).map(c => ({
+          sha: c.sha.slice(0, 7),
+          message: c.message.split('\n')[0],
+        })),
+      }));
+
+    return { owner, repo, pushEventCount: pushEvents.length, events: pushEvents };
+  },
+});
+
+/**
+ * List all active projects and whether they would be processed by the tracking cron.
+ * A project is eligible if it has both a GitHub URL and a GitHub token configured.
+ *
+ * Usage — Convex Dashboard > Functions > debug:testTrackingConditions
+ *   args: {}
+ */
+export const testTrackingConditions = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{
+    totalActiveProjects: number;
+    wouldRun: number;
+    wouldSkip: number;
+    projects: Array<{
+      projectId: string;
+      name: string;
+      githubUrl: string | null;
+      hasGithubUrl: boolean;
+      hasToken: boolean;
+      wouldRun: boolean;
+      skipReason: string | null;
+    }>;
+  }> => {
+    const activeProjects = await ctx.runQuery(internal.projects.listActiveProjects, {});
+
+    const results = await Promise.all(
+      (activeProjects as Array<{
+        _id: string;
+        userId: string;
+        name?: string;
+        projectLinks?: { github?: string };
+      }>).map(async (project) => {
+        const profile = await ctx.runQuery(internal.userProfiles.getProfileByUserId, {
+          userId: project.userId,
+        }) as { githubToken?: string } | null;
+        const hasGithubUrl = !!project.projectLinks?.github;
+        const hasToken = !!profile?.githubToken;
+        return {
+          projectId: project._id,
+          name: project.name ?? 'unnamed',
+          githubUrl: project.projectLinks?.github ?? null,
+          hasGithubUrl,
+          hasToken,
+          wouldRun: hasGithubUrl && hasToken,
+          skipReason: !hasGithubUrl ? 'no GitHub URL' : !hasToken ? 'no GitHub token' : null,
+        };
+      }),
+    );
+
+    return {
+      totalActiveProjects: results.length,
+      wouldRun: results.filter(r => r.wouldRun).length,
+      wouldSkip: results.filter(r => !r.wouldRun).length,
+      projects: results,
+    };
   },
 });
