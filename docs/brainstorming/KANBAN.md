@@ -85,7 +85,7 @@
 
 ---
 
-## EPIC E — Web Search
+## EPIC E — GitHub Tracking & Primitives
 > P3
 
 ---
@@ -101,20 +101,36 @@
 
 ---
 
-### E-02 · Liens de monitoring par projet [P3]
+### E-02 · Liens de monitoring par projet [DONE] ✅
 
-**En tant qu'** utilisateur ayant un projet actif
-**Je veux** associer des liens (GitHub, site, réseaux sociaux) à mon projet
-**Afin que** l'agent puisse surveiller automatiquement l'avancement et me faire des comptes-rendus
+**État :** Implémenté.
+- `projectLinks.github` sur le schéma projet (`convex/schema.ts`)
+- UI d'édition des liens dans les settings du projet
+- Cron 23:00 UTC GitHub-only (`convex/crons.ts`) — déclenché uniquement si `githubUrl + githubToken` configurés
+- Artefact de tracking sauvegardé dans la table `artifacts` (`convex/tracking.ts`)
+- `validateGitHubToken` action disponible dans `convex/github.ts`
+
+**Note :** Token GitHub = profil utilisateur (`userProfiles.githubToken`) — clé d'accès API. Lien GitHub = projet (`projects.projectLinks.github`) — URL du repo à tracker.
+
+---
+
+### E-04 · GitHub primitives pour agents [P3]
+
+**En tant qu'** agent (tracking, chat, challenges)
+**Je veux** interroger GitHub de façon ciblée via des primitives dédiées
+**Afin de** récupérer des informations précises sans parser un bloc texte monolithique
 
 **Critères d'acceptation**
-- [ ] Champs liens (GitHub, site web, Instagram, TikTok) sur le document projet dans `convex/schema.ts`
-- [ ] UI d'édition des liens dans la fiche projet (ou section dédiée dans les settings du projet)
-- [ ] Si aucun lien projet défini → fallback sur les liens du profil utilisateur (`userProfiles`) avec avertissement contextuel
-- [ ] Le cron existant (`convex/crons.ts`) est étendu pour fetcher + résumer l'activité de ces URLs
-- [ ] Le résumé est sauvegardé comme artefact accessible depuis la fiche projet
+- [ ] `convex/tools/scrape/github.ts` expose des primitives séparées :
+  - `getRepoStats(owner, repo, token)` — stars, forks, open issues, default branch
+  - `getActiveBranches(owner, repo, token)` — top 5 branches par dernière activité
+  - `getCommitsByBranch(owner, repo, branch, token, limit)` — commits récents d'une branche
+  - `getOpenPRs(owner, repo, token)` — PRs ouvertes avec titre + branche
+- [ ] `githubFetch` est refactorisé pour appeler ces primitives (comportement identique)
+- [ ] L'agent tracking dispose d'un tool `getGitHubCommits` pour requêter une branche précise
+- [ ] Zéro régression sur `validateGitHubToken` et `debug:testGitHub`
 
-**Notes techniques:** Liens utilisateur déjà présents dans `userProfiles` (GitHub, Instagram, TikTok, site — settings screen). Créer un champ `projectLinks` ou table `projectLinks` liée aux projets. Cron existant : `'0 6 * * *'` dans `convex/crons.ts`.
+**Notes techniques:** `convex/tools/scrape/github.ts` — actuellement 3 appels API inline dans `githubFetch`. Extraire en fonctions exportées réutilisables.
 
 ---
 
@@ -216,5 +232,81 @@
 - [ ] La logique de guard ne ralentit pas le flux nominal de manière perceptible
 
 **Notes techniques:** Peut être implémenté comme une vérification rapide dans `sendMessage` avant d'appeler `routerAgent`, ou comme un agent Haiku dédié. `convex/agents/routerAgent.ts` — aucune modération actuellement.
+
+---
+
+## EPIC J — Challenges GitHub-Driven
+> P3
+
+---
+
+### J-01 · Challenge templates GitHub [P3]
+
+**En tant qu'** agent qui génère des défis quotidiens
+**Je veux** proposer des challenges liés à l'activité GitHub
+**Afin que** la progression soit mesurable objectivement
+
+**Critères d'acceptation**
+- [ ] Ajouter des templates GitHub dans `SYSTEM_CHALLENGE_POOL` de `convex/gamification.ts` :
+  - "Push au moins 1 commit sur ta branche active aujourd'hui"
+  - "Ouvre une PR ou mets à jour une PR existante"
+  - "Ferme au moins 1 issue ouverte"
+  - "Crée une nouvelle branche pour la prochaine feature"
+- [ ] Le cron `generateDailyChallenges` sélectionne ces templates si le projet a un lien GitHub configuré
+- [ ] Les challenges GitHub sont distingués par un champ `validationType: 'github' | 'conversation'` dans le schéma
+- [ ] Maximum 10 challenges actifs par jour — dès qu'un challenge est accompli, un slot se libère
+
+**Notes techniques:** `convex/gamification.ts` — `SYSTEM_CHALLENGE_POOL` (7 templates génériques actuellement). Ajouter champ `validationType` dans `convex/schema.ts` table `dailyChallenges`.
+
+---
+
+### J-02 · Validation des challenges via GitHub [P3]
+
+**En tant qu'** utilisateur qui essaie de valider un challenge GitHub
+**Je veux** que l'agent vérifie mon activité GitHub
+**Afin que** la validation soit objective et non auto-déclarée
+
+**Critères d'acceptation**
+- [ ] `validateAndCompleteDailyChallenge` dans `convex/gamification.ts` : si `validationType === 'github'`, appeler l'API GitHub au lieu de lire la conversation
+- [ ] Vérification : commit sur branche active dans les dernières 24h → challenge "commit" auto-complété
+- [ ] Si le token GitHub n'est pas configuré → fallback sur la validation par conversation (comportement actuel)
+- [ ] Cooldown 30 min conservé si la vérification GitHub échoue
+
+**Notes techniques:** Réutiliser les primitives E-04. Déclenché depuis `convex/gamification.ts:validateAndCompleteDailyChallenge`.
+
+---
+
+### J-03 · Tracking cron → mise à jour des challenges [P3]
+
+**En tant que** cron de tracking qui analyse l'activité GitHub
+**Je veux** pouvoir marquer automatiquement des challenges comme complétés
+**Afin que** l'utilisateur soit récompensé sans avoir à le déclarer manuellement
+
+**Critères d'acceptation**
+- [ ] L'agent tracking a accès à un tool `completeChallenge` (en plus de `scrapeUrl` et `saveReport`)
+- [ ] L'agent compare les commits détectés avec les challenges GitHub actifs du jour
+- [ ] Si un commit correspond à un challenge (ex. branche + message), il le complète automatiquement
+- [ ] L'artefact de tracking mentionne les challenges auto-complétés dans la section "Signals"
+
+**Notes techniques:** `convex/tracking.ts` — ajouter un 3e tool `completeChallenge` qui appelle `internal.gamification.completeDailyChallenge`. Passer les challenges du jour dans le prompt.
+
+---
+
+### J-04 · Modal in-app sur challenges auto-complétés [P3]
+
+**En tant qu'** utilisateur qui ouvre l'application
+**Je veux** voir un récapitulatif des challenges complétés automatiquement (par le cron GitHub) depuis ma dernière visite
+**Afin d'** être félicité et de comprendre pourquoi j'ai reçu des points
+
+**Critères d'acceptation**
+- [ ] Chaque challenge complété par le cron dispose d'un champ `seenAt?: number` dans la table `dailyChallenges`
+- [ ] À l'ouverture de l'app (`recordAppOpen`), vérifier s'il existe des challenges auto-complétés non vus
+- [ ] Si oui → afficher un modal de félicitation (pattern identique à `DailyRitualModal` ou `LevelUpModal`) listant les challenges + points gagnés
+- [ ] Si plusieurs challenges : liste groupée dans le même modal
+- [ ] Marquer `seenAt` dès que le modal est affiché
+
+**Hors scope :** push notifications (infrastructure à prévoir séparément)
+
+**Notes techniques:** `convex/schema.ts` — ajouter `seenAt?: number` sur la table `dailyChallenges`. `convex/gamification.ts:recordAppOpen` — ajouter requête des challenges non vus. Pattern UI : `src/features/idea/components/daily-ritual-modal.tsx`.
 
 ---
