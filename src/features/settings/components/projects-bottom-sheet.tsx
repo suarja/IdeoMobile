@@ -5,8 +5,9 @@ import { Alert, TextInput, TouchableOpacity, View } from 'react-native';
 import { colors, Text } from '@/components/ui';
 import { Modal, useModal } from '@/components/ui/modal';
 import { useListProjects, useSetActiveProject } from '@/features/focus/api';
+import { useCreateProject } from '@/features/idea/api';
 import { translate } from '@/lib/i18n';
-import { useUpdateProjectLinks } from '../api';
+import { useUpdateProjectLinks, useUpdateProjectName } from '../api';
 import { SettingsItem } from './settings-item';
 
 type ProjectLinks = {
@@ -48,22 +49,39 @@ const INPUT_STYLE = {
   borderWidth: 1,
   borderColor: colors.brand.border,
   borderRadius: 8,
-  paddingHorizontal: 12,
-  paddingVertical: 8,
-  fontSize: 13,
-  color: colors.brand.dark,
-  backgroundColor: colors.brand.bg,
+  paddingHorizontal: 14,
+  paddingVertical: 14,
+  minHeight: 48,
+  fontSize: 15,
+  backgroundColor: '#FFFFFF',
   flex: 1,
 } as const;
 
-type LinksFormProps = {
+const TEXT_INPUT_COLOR = '#433831';
+
+const SEPARATOR_STYLE = {
+  height: 1,
+  backgroundColor: 'rgba(0,0,0,0.06)',
+  marginHorizontal: 16,
+} as const;
+
+type ExpandedFormProps = {
+  projectId: Id<'projects'>;
   isActive: boolean;
+  initialName: string;
   initialLinks: ProjectLinks;
   onSetActive: () => void;
-  onSave: (links: ProjectLinks) => Promise<void>;
+  onSave: (name: string, links: ProjectLinks) => Promise<void>;
 };
 
-function ProjectLinksForm({ isActive, initialLinks, onSetActive, onSave }: LinksFormProps) {
+function ProjectExpandedForm({
+  isActive,
+  initialName,
+  initialLinks,
+  onSetActive,
+  onSave,
+}: ExpandedFormProps) {
+  const [localName, setLocalName] = React.useState(initialName);
   const [localLinks, setLocalLinks] = React.useState<ProjectLinks>(initialLinks);
   const [saving, setSaving] = React.useState(false);
 
@@ -78,7 +96,7 @@ function ProjectLinksForm({ isActive, initialLinks, onSetActive, onSave }: Links
     }
     setSaving(true);
     try {
-      await onSave(localLinks);
+      await onSave(localName.trim(), localLinks);
     }
     finally {
       setSaving(false);
@@ -96,6 +114,18 @@ function ProjectLinksForm({ isActive, initialLinks, onSetActive, onSave }: Links
       }}
     >
       <Text style={{ fontSize: 12, fontWeight: '700', color: colors.brand.muted, textTransform: 'uppercase', marginTop: 12, marginBottom: 8 }}>
+        {translate('settings.project_name_label')}
+      </Text>
+      <TextInput
+        value={localName}
+        onChangeText={setLocalName}
+        placeholder={translate('settings.project_name_placeholder')}
+        placeholderTextColor={colors.brand.muted}
+        style={[INPUT_STYLE, { color: TEXT_INPUT_COLOR }]}
+        autoCapitalize="none"
+      />
+
+      <Text style={{ fontSize: 12, fontWeight: '700', color: colors.brand.muted, textTransform: 'uppercase', marginTop: 12, marginBottom: 8 }}>
         {translate('settings.project_links')}
       </Text>
 
@@ -109,7 +139,7 @@ function ProjectLinksForm({ isActive, initialLinks, onSetActive, onSave }: Links
             onChangeText={val => setLocalLinks(prev => ({ ...prev, [platform]: val }))}
             placeholder="https://..."
             placeholderTextColor={colors.brand.muted}
-            style={INPUT_STYLE}
+            style={[INPUT_STYLE, { color: TEXT_INPUT_COLOR }]}
             autoCapitalize="none"
             keyboardType="url"
           />
@@ -160,12 +190,12 @@ type ProjectRowProps = {
   isExpanded: boolean;
   onToggle: () => void;
   onSetActive: () => void;
-  onSaveLinks: (links: ProjectLinks) => Promise<void>;
+  onSave: (name: string, links: ProjectLinks) => Promise<void>;
 };
 
-function ProjectRow({ project, isExpanded, onToggle, onSetActive, onSaveLinks }: ProjectRowProps) {
+function ProjectRow({ project, isExpanded, onToggle, onSetActive, onSave }: ProjectRowProps) {
   return (
-    <View>
+    <View style={project.isActive ? { backgroundColor: colors.brand.selected } : undefined}>
       <TouchableOpacity
         onPress={onToggle}
         style={{
@@ -179,16 +209,16 @@ function ProjectRow({ project, isExpanded, onToggle, onSetActive, onSaveLinks }:
       >
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.brand.dark }}>
+              {project.name ?? translate('settings.no_name_project')}
+            </Text>
             {project.isActive && (
-              <View style={{ backgroundColor: colors.brand.dark, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
+              <View style={{ backgroundColor: colors.brand.dark, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 2 }}>
                 <Text style={{ fontSize: 11, fontWeight: '600', color: colors.brand.bg }}>
                   {translate('settings.active_badge')}
                 </Text>
               </View>
             )}
-            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.brand.dark }}>
-              {project.name ?? translate('settings.no_name_project')}
-            </Text>
           </View>
           <Text style={{ fontSize: 12, color: colors.brand.muted, marginTop: 2 }}>
             {new Date(project.createdAt).toLocaleDateString()}
@@ -200,12 +230,107 @@ function ProjectRow({ project, isExpanded, onToggle, onSetActive, onSaveLinks }:
       </TouchableOpacity>
 
       {isExpanded && (
-        <ProjectLinksForm
+        <ProjectExpandedForm
+          projectId={project.projectId}
           isActive={project.isActive}
+          initialName={project.name ?? ''}
           initialLinks={fromProjectLinks(project.projectLinks)}
           onSetActive={onSetActive}
-          onSave={onSaveLinks}
+          onSave={onSave}
         />
+      )}
+    </View>
+  );
+}
+
+type NewProjectRowProps = {
+  onCreated: () => void;
+};
+
+function NewProjectRow({ onCreated }: NewProjectRowProps) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [name, setName] = React.useState('');
+  const [creating, setCreating] = React.useState(false);
+  const createProject = useCreateProject();
+
+  const handleCreate = async () => {
+    const trimmed = name.trim();
+    if (!trimmed)
+      return;
+    setCreating(true);
+    try {
+      await createProject({ name: trimmed });
+      setName('');
+      setExpanded(false);
+      onCreated();
+    }
+    finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <View>
+      <TouchableOpacity
+        onPress={() => setExpanded(prev => !prev)}
+        style={{
+          paddingVertical: 14,
+          paddingHorizontal: 16,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+        activeOpacity={0.7}
+      >
+        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.brand.dark }}>
+          +
+          {' '}
+          {translate('settings.new_project_button')}
+        </Text>
+        <Text style={{ fontSize: 18, color: colors.brand.muted }}>
+          {expanded ? '−' : '+'}
+        </Text>
+      </TouchableOpacity>
+
+      {expanded && (
+        <View
+          style={{
+            paddingHorizontal: 16,
+            paddingBottom: 16,
+            backgroundColor: colors.brand.selected,
+            borderTopWidth: 1,
+            borderTopColor: colors.brand.border,
+          }}
+        >
+          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.brand.muted, textTransform: 'uppercase', marginTop: 12, marginBottom: 8 }}>
+            {translate('settings.project_name_label')}
+          </Text>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder={translate('settings.project_name_placeholder')}
+            placeholderTextColor={colors.brand.muted}
+            style={[INPUT_STYLE, { color: TEXT_INPUT_COLOR }]}
+            autoCapitalize="none"
+            autoFocus
+          />
+          <TouchableOpacity
+            onPress={() => void handleCreate()}
+            disabled={creating || !name.trim()}
+            style={{
+              marginTop: 12,
+              paddingVertical: 10,
+              borderRadius: 10,
+              backgroundColor: colors.brand.dark,
+              alignItems: 'center',
+              opacity: creating || !name.trim() ? 0.4 : 1,
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '600', color: colors.brand.bg }}>
+              {translate('settings.create_project_button')}
+            </Text>
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
@@ -216,6 +341,7 @@ export function ProjectsItem() {
   const projects = useListProjects();
   const setActive = useSetActiveProject();
   const updateLinks = useUpdateProjectLinks();
+  const updateName = useUpdateProjectName();
 
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
 
@@ -230,8 +356,11 @@ export function ProjectsItem() {
     modal.ref.current?.dismiss();
   };
 
-  const handleSaveLinks = async (_projectId: Id<'projects'>, links: ProjectLinks) => {
-    await updateLinks({ projectLinks: toProjectLinksPayload(links) });
+  const handleSave = async (projectId: Id<'projects'>, name: string, links: ProjectLinks) => {
+    if (name) {
+      await updateName({ projectId, name });
+    }
+    await updateLinks({ projectId, projectLinks: toProjectLinksPayload(links) });
   };
 
   return (
@@ -255,6 +384,8 @@ export function ProjectsItem() {
           </Text>
         </View>
         <View>
+          <NewProjectRow onCreated={() => setExpandedId(null)} />
+          <View style={SEPARATOR_STYLE} />
           {(projects ?? []).map((project, idx) => (
             <View key={String(project.projectId)}>
               <ProjectRow
@@ -262,10 +393,10 @@ export function ProjectsItem() {
                 isExpanded={expandedId === String(project.projectId)}
                 onToggle={() => handleToggle(project.projectId)}
                 onSetActive={() => void handleSetActive(project.projectId)}
-                onSaveLinks={links => handleSaveLinks(project.projectId, links)}
+                onSave={(name, links) => handleSave(project.projectId, name, links)}
               />
               {idx < (projects?.length ?? 0) - 1 && (
-                <View style={{ height: 1, backgroundColor: 'rgba(0,0,0,0.06)', marginHorizontal: 16 }} />
+                <View style={SEPARATOR_STYLE} />
               )}
             </View>
           ))}

@@ -1,5 +1,7 @@
 import type { BottomSheetModal } from '@gorhom/bottom-sheet';
+import type { Id } from '../../../convex/_generated/dataModel';
 import type { Artifact, ArtifactType } from './api';
+
 import type { InsightsTab } from './components/insights-segment-control';
 
 import * as React from 'react';
@@ -7,6 +9,7 @@ import { ActivityIndicator, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, FocusAwareStatusBar, ScrollView, Text, View } from '@/components/ui';
 import { useModal } from '@/components/ui/modal';
+import { useActiveProject } from '@/features/idea/api';
 import { translate } from '@/lib/i18n';
 import { useArtifacts } from './api';
 import { ArtifactCard } from './components/artifact-card';
@@ -15,12 +18,14 @@ import { InsightsSegmentControl } from './components/insights-segment-control';
 
 function ArtifactList({
   type,
+  projectId,
   onSelect,
 }: {
   type: ArtifactType;
+  projectId: Id<'projects'> | null | undefined;
   onSelect: (artifact: Artifact) => void;
 }) {
-  const artifacts = useArtifacts(type);
+  const artifacts = useArtifacts(type, projectId);
 
   if (artifacts === undefined) {
     return (
@@ -66,6 +71,7 @@ export function InsightsScreen() {
   const [activeTab, setActiveTab] = React.useState<InsightsTab>('validation');
   const [selectedArtifact, setSelectedArtifact] = React.useState<Artifact | null>(null);
   const detailSheet = useModal();
+  const activeProject = useActiveProject();
 
   const handleSelect = React.useCallback((artifact: Artifact) => {
     setSelectedArtifact(artifact);
@@ -73,6 +79,7 @@ export function InsightsScreen() {
   }, [detailSheet]);
 
   const activeType: ArtifactType = activeTab === 'validation' ? 'validation' : 'tracking';
+  const projectId = activeProject?.projectId ?? null;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.brand.bg }}>
@@ -85,7 +92,7 @@ export function InsightsScreen() {
       >
         <InsightsSegmentControl activeTab={activeTab} onChange={setActiveTab} />
 
-        <ArtifactList type={activeType} onSelect={handleSelect} />
+        <ArtifactList type={activeType} projectId={projectId} onSelect={handleSelect} />
       </ScrollView>
 
       <ArtifactDetailSheet

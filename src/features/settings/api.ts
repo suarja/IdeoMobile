@@ -32,6 +32,10 @@ export function useUpdateProjectLinks() {
   return useMutation(api.projects.updateProjectLinks);
 }
 
+export function useUpdateProjectName() {
+  return useMutation(api.projects.updateProjectName);
+}
+
 export function useSetGitHubToken() {
   return useMutation(api.userProfiles.setGitHubToken);
 }

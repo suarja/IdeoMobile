@@ -1,4 +1,4 @@
-import type { Id } from '../../../convex/_generated/dataModel';
+import type { Doc, Id } from '../../../convex/_generated/dataModel';
 import { useConvexAuth, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 
@@ -6,22 +6,12 @@ import { api } from '../../../convex/_generated/api';
 
 export type ArtifactType = 'validation' | 'tracking';
 
-export type Artifact = {
-  _id: Id<'artifacts'>;
-  userId: string;
-  threadId?: string;
-  type: ArtifactType;
-  title: string;
-  content: string;
-  tldr: string;
-  date: string;
-  createdAt: number;
-};
+export type Artifact = Doc<'artifacts'>;
 
-export function useArtifacts(type: ArtifactType) {
+export function useArtifacts(type: ArtifactType, projectId?: Id<'projects'> | null) {
   const { isAuthenticated } = useConvexAuth();
   return useQuery(
     api.artifacts.listArtifacts,
-    isAuthenticated ? { type } : 'skip',
+    isAuthenticated ? { type, ...(projectId ? { projectId } : {}) } : 'skip',
   );
 }

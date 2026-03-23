@@ -5,8 +5,8 @@ import { internalMutation, internalQuery, mutation, query } from './_generated/s
 import { generalAgent } from './agents/chatAgent';
 
 export const createProjectAndThread = internalMutation({
-  args: {},
-  handler: async (ctx): Promise<{ projectId: Id<'projects'>; threadId: string }> => {
+  args: { name: v.optional(v.string()) },
+  handler: async (ctx, args): Promise<{ projectId: Id<'projects'>; threadId: string }> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new Error('Unauthenticated');
@@ -37,6 +37,7 @@ export const createProjectAndThread = internalMutation({
       isActive: true,
       status: 'active',
       createdAt: Date.now(),
+      ...(args.name ? { name: args.name } : {}),
     });
 
     await ctx.runMutation(internal.gamification.initProjectScores, { threadId, userId });
@@ -46,9 +47,9 @@ export const createProjectAndThread = internalMutation({
 });
 
 export const createProject = mutation({
-  args: {},
-  handler: async (ctx): Promise<{ projectId: Id<'projects'>; threadId: string }> => {
-    return ctx.runMutation(internal.projects.createProjectAndThread, {});
+  args: { name: v.optional(v.string()) },
+  handler: async (ctx, args): Promise<{ projectId: Id<'projects'>; threadId: string }> => {
+    return ctx.runMutation(internal.projects.createProjectAndThread, { name: args.name });
   },
 });
 
@@ -132,6 +133,7 @@ export const listProjects = query({
         name: p.name ?? null,
         status: p.status,
         isActive: p.isActive,
+        isTracked: p.isTracked ?? false,
         createdAt: p.createdAt,
         projectLinks: p.projectLinks ?? null,
       }));
@@ -148,6 +150,30 @@ export const listActiveProjects = internalQuery({
   },
 });
 
+export const listTrackedProjects = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return ctx.db
+      .query('projects')
+      .filter(q => q.eq(q.field('isTracked'), true))
+      .collect();
+  },
+});
+
+export const setIsTracked = mutation({
+  args: { projectId: v.id('projects'), isTracked: v.boolean() },
+  handler: async (ctx, { projectId, isTracked }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      throw new Error('Unauthenticated');
+    const userId = identity.subject;
+    const project = await ctx.db.get(projectId);
+    if (!project || project.userId !== userId)
+      throw new Error('Forbidden');
+    await ctx.db.patch(projectId, { isTracked });
+  },
+});
+
 export const setTrackingThreadId = internalMutation({
   args: { projectId: v.id('projects'), trackingThreadId: v.string() },
   handler: async (ctx, { projectId, trackingThreadId }) => {
@@ -157,6 +183,7 @@ export const setTrackingThreadId = internalMutation({
 
 export const updateProjectLinks = mutation({
   args: {
+    projectId: v.id('projects'),
     projectLinks: v.object({
       github: v.optional(v.string()),
       website: v.optional(v.string()),
@@ -164,24 +191,35 @@ export const updateProjectLinks = mutation({
       instagram: v.optional(v.string()),
     }),
   },
-  handler: async (ctx, { projectLinks }) => {
+  handler: async (ctx, { projectId, projectLinks }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity)
       throw new Error('Unauthenticated');
     const userId = identity.subject;
-    const project = await ctx.db
-      .query('projects')
-      .withIndex('by_userId_active', q => q.eq('userId', userId).eq('isActive', true))
-      .first();
-    if (!project)
-      throw new Error('No active project');
-    await ctx.db.patch(project._id, { projectLinks });
+    const project = await ctx.db.get(projectId);
+    if (!project || project.userId !== userId)
+      throw new Error('Forbidden');
+    await ctx.db.patch(projectId, { projectLinks });
   },
 });
 
-export const updateProjectName = internalMutation({
+export const updateProjectNameInternal = internalMutation({
   args: { projectId: v.id('projects'), name: v.string() },
   handler: async (ctx, { projectId, name }) => {
+    await ctx.db.patch(projectId, { name });
+  },
+});
+
+export const updateProjectName = mutation({
+  args: { projectId: v.id('projects'), name: v.string() },
+  handler: async (ctx, { projectId, name }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      throw new Error('Unauthenticated');
+    const userId = identity.subject;
+    const project = await ctx.db.get(projectId);
+    if (!project || project.userId !== userId)
+      throw new Error('Forbidden');
     await ctx.db.patch(projectId, { name });
   },
 });

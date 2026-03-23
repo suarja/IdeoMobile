@@ -5,6 +5,7 @@ export const saveArtifact = internalMutation({
   args: {
     userId: v.string(),
     threadId: v.optional(v.string()),
+    projectId: v.optional(v.id('projects')),
     type: v.union(v.literal('validation'), v.literal('tracking')),
     title: v.string(),
     content: v.string(),
@@ -17,12 +18,26 @@ export const saveArtifact = internalMutation({
 });
 
 export const listArtifacts = query({
-  args: { type: v.union(v.literal('validation'), v.literal('tracking')) },
-  handler: async (ctx, { type }) => {
+  args: {
+    type: v.union(v.literal('validation'), v.literal('tracking')),
+    projectId: v.optional(v.id('projects')),
+  },
+  handler: async (ctx, { type, projectId }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity)
       return [];
     const userId = identity.subject;
+
+    if (projectId) {
+      // Strict per-project: only artifacts that explicitly belong to this project
+      return ctx.db
+        .query('artifacts')
+        .withIndex('by_project_type', q => q.eq('projectId', projectId).eq('type', type))
+        .order('desc')
+        .take(30);
+    }
+
+    // No active project → fallback: show user-level artifacts (legacy or unscoped)
     return ctx.db
       .query('artifacts')
       .withIndex('by_user_type', q => q.eq('userId', userId).eq('type', type))
@@ -45,8 +60,15 @@ export const getArtifact = query({
 });
 
 export const getTrackingArtifactForDate = internalQuery({
-  args: { userId: v.string(), date: v.string() },
-  handler: async (ctx, { userId, date }) => {
+  args: { userId: v.string(), projectId: v.optional(v.id('projects')), date: v.string() },
+  handler: async (ctx, { userId, projectId, date }) => {
+    if (projectId) {
+      return ctx.db
+        .query('artifacts')
+        .withIndex('by_project_date', q => q.eq('projectId', projectId).eq('date', date))
+        .filter(q => q.eq(q.field('type'), 'tracking'))
+        .first();
+    }
     return ctx.db
       .query('artifacts')
       .withIndex('by_user_date', q => q.eq('userId', userId).eq('date', date))

@@ -334,6 +334,7 @@ function buildSpecializedTools(
   runQuery: RunQueryFn,
   threadId: string,
   userId: string,
+  projectId?: Id<'projects'>,
 ) {
   if (specialist === 'validation' || specialist === 'distribution') {
     return {
@@ -374,6 +375,7 @@ function buildSpecializedTools(
           await runMutation(internal.artifacts.saveArtifact, {
             userId,
             threadId,
+            projectId,
             type,
             title,
             content,
@@ -401,10 +403,11 @@ export const sendMessage = action({
     const messageCount = await ctx.runQuery(internal.chat.countMessages, { threadId });
     await ctx.runMutation(internal.chat.insertMessage, { threadId, role: 'user', content });
 
-    const [memData, lastMessages, projectScores] = await Promise.all([
+    const [memData, lastMessages, projectScores, currentProject] = await Promise.all([
       ctx.runQuery(internal.chat.getMemoryForThread, { threadId }),
       ctx.runQuery(internal.chat.listMessagesInternal, { threadId }),
       ctx.runQuery(internal.gamification.getProjectScoresInternal, { threadId }),
+      ctx.runQuery(internal.chat.getProjectByThreadId, { threadId }),
     ]);
 
     // Router (Haiku): route + optionally compress + select relevant memory
@@ -441,6 +444,7 @@ export const sendMessage = action({
       ctx.runQuery.bind(ctx),
       threadId,
       memData.userId ?? '',
+      currentProject?._id,
     );
 
     const { thread } = await selectedAgent.continueThread(ctx, { threadId });
@@ -566,7 +570,7 @@ export const generateThreadTitle = internalAction({
 
     const project = await ctx.runQuery(internal.chat.getProjectByThreadId, { threadId });
     if (project) {
-      await ctx.runMutation(internal.projects.updateProjectName, { projectId: project._id, name: title });
+      await ctx.runMutation(internal.projects.updateProjectNameInternal, { projectId: project._id, name: title });
     }
   },
 });

@@ -1,3 +1,4 @@
+import type { Id } from './_generated/dataModel';
 import { anthropic } from '@ai-sdk/anthropic';
 import { Agent } from '@convex-dev/agent';
 import { tool } from 'ai';
@@ -118,7 +119,14 @@ function buildScrapeUrlTool({ runMutation, runQuery, userId, githubToken }: Scra
   });
 }
 
-function buildSaveReportTool(runMutation: RunMutationFn, userId: string, trackingThreadId: string) {
+type SaveReportToolCtx = {
+  runMutation: RunMutationFn;
+  userId: string;
+  trackingThreadId: string;
+  projectId?: Id<'projects'>;
+};
+
+function buildSaveReportTool({ runMutation, userId, trackingThreadId, projectId }: SaveReportToolCtx) {
   return tool({
     description: 'Save the completed daily tracking report as a persistent artifact visible in the Insights tab.',
     inputSchema: z.object({
@@ -131,6 +139,7 @@ function buildSaveReportTool(runMutation: RunMutationFn, userId: string, trackin
       await runMutation(internal.artifacts.saveArtifact, {
         userId,
         threadId: trackingThreadId,
+        projectId,
         type: 'tracking' as const,
         title,
         content,
@@ -150,12 +159,13 @@ export const generateDailyTrackingReports = internalAction({
   args: {},
   handler: async (ctx) => {
     const today = new Date().toISOString().split('T')[0];
-    const activeProjects = await ctx.runQuery(internal.projects.listActiveProjects, {});
+    const activeProjects = await ctx.runQuery(internal.projects.listTrackedProjects, {});
 
     for (const project of activeProjects) {
       // Idempotence: skip if already generated today
       const existing = await ctx.runQuery(internal.artifacts.getTrackingArtifactForDate, {
         userId: project.userId,
+        projectId: project._id,
         date: today,
       });
       if (existing)
@@ -216,7 +226,7 @@ export const generateDailyTrackingReports = internalAction({
             userId: project.userId,
             githubToken,
           }),
-          saveReport: buildSaveReportTool(ctx.runMutation.bind(ctx), project.userId, trackingThreadId),
+          saveReport: buildSaveReportTool({ runMutation: ctx.runMutation.bind(ctx), userId: project.userId, trackingThreadId, projectId: project._id }),
         },
       });
     }

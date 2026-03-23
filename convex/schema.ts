@@ -108,6 +108,7 @@ export default defineSchema({
     name: v.optional(v.string()),
     threadId: v.string(),
     isActive: v.boolean(),
+    isTracked: v.optional(v.boolean()), // included in daily tracking cron
     status: v.union(v.literal('active'), v.literal('paused'), v.literal('abandoned')),
     createdAt: v.number(),
     validationSearchCount: v.optional(v.number()),
@@ -174,6 +175,7 @@ export default defineSchema({
   artifacts: defineTable({
     userId: v.string(),
     threadId: v.optional(v.string()),
+    projectId: v.optional(v.id('projects')),
     type: v.union(v.literal('validation'), v.literal('tracking')),
     title: v.string(),
     content: v.string(),
@@ -182,7 +184,9 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index('by_user_type', ['userId', 'type'])
-    .index('by_user_date', ['userId', 'date']),
+    .index('by_user_date', ['userId', 'date'])
+    .index('by_project_type', ['projectId', 'type'])
+    .index('by_project_date', ['projectId', 'date']),
 
   // --- App Config ---
 
