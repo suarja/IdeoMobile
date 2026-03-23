@@ -26,6 +26,7 @@ import { NotificationModal } from '../focus/components/notification-modal';
 import { DailyRitualModal } from '../idea/components/daily-ritual-modal';
 import { PointsBanner } from '../idea/components/points-banner';
 import { useAppConfig, useSetStandupTime, useUserProfile } from './api';
+import { DevNavigationBottomSheet } from './components/dev-navigation-bottom-sheet';
 import { DevStorageBottomSheet } from './components/dev-storage-bottom-sheet';
 import { LanguageItem } from './components/language-item';
 import { MemoryItem } from './components/memory-bottom-sheet';
@@ -171,6 +172,7 @@ function SectionNotifications({
 function SectionDeveloper({
   iconColor,
   onOpenStorage,
+  onOpenNavigation,
   onOpenDailyRitual,
   onOpenLevelUp,
   onOpenNotification,
@@ -179,6 +181,7 @@ function SectionDeveloper({
 }: {
   iconColor: string;
   onOpenStorage: () => void;
+  onOpenNavigation: () => void;
   onOpenDailyRitual: () => void;
   onOpenLevelUp: () => void;
   onOpenNotification: () => void;
@@ -192,6 +195,17 @@ function SectionDeveloper({
         icon={<Ionicons name="construct-outline" size={20} color={iconColor} />}
         onPress={onOpenStorage}
       />
+      <Pressable
+        className="flex-1 flex-row items-center justify-between px-4 py-3"
+        onPress={onOpenNavigation}
+      >
+        <View className="flex-row items-center">
+          <View className="pr-1.5">
+            <Ionicons name="map-outline" size={20} color={iconColor} />
+          </View>
+          <Text style={{ color: colors.brand.dark }}>Navigation</Text>
+        </View>
+      </Pressable>
       <Pressable
         className="flex-1 flex-row items-center justify-between px-4 py-3"
         onPress={onOpenDailyRitual}
@@ -276,12 +290,13 @@ const DEBUG_CHALLENGE: DailyChallenge = {
 
 function useDevDebug() {
   const devModal = useModal();
+  const navModal = useModal();
   const levelUpDebugModal = useModal();
   const notificationDebugModal = useModal();
   const [showDailyRitual, setShowDailyRitual] = useState(false);
   const [showPointsBanner, setShowPointsBanner] = useState(false);
   const [challengeToasts, setChallengeToasts] = useState<DailyChallenge[]>([]);
-  return { devModal, levelUpDebugModal, notificationDebugModal, showDailyRitual, setShowDailyRitual, showPointsBanner, setShowPointsBanner, challengeToasts, setChallengeToasts };
+  return { devModal, navModal, levelUpDebugModal, notificationDebugModal, showDailyRitual, setShowDailyRitual, showPointsBanner, setShowPointsBanner, challengeToasts, setChallengeToasts };
 }
 
 type DevDebug = ReturnType<typeof useDevDebug>;
@@ -291,6 +306,7 @@ function DevDebugOverlays({ dev }: { dev: DevDebug }) {
   return (
     <>
       <DevStorageBottomSheet modalRef={dev.devModal.ref} />
+      <DevNavigationBottomSheet modalRef={dev.navModal.ref} />
       <DailyRitualModal
         visible={dev.showDailyRitual}
         onClose={() => dev.setShowDailyRitual(false)}
@@ -374,6 +390,7 @@ export function SettingsScreen() {
             <SectionDeveloper
               iconColor={iconColor}
               onOpenStorage={() => dev.devModal.present()}
+              onOpenNavigation={() => dev.navModal.present()}
               onOpenDailyRitual={() => dev.setShowDailyRitual(true)}
               onOpenLevelUp={() => dev.levelUpDebugModal.present()}
               onOpenNotification={() => dev.notificationDebugModal.present()}

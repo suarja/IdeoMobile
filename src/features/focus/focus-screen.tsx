@@ -4,6 +4,7 @@ import type { SegmentTab } from './components/segment-control';
 import { useEffect, useRef, useState } from 'react';
 
 import { ActivityIndicator, Modal, StyleSheet, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, FocusAwareStatusBar, ScrollView, Text, View } from '@/components/ui';
 import { useModal } from '@/components/ui/modal';
 import { haptics } from '@/lib/services/haptics';
@@ -391,6 +392,7 @@ function ProjectGoalsSection() {
 }
 
 export function FocusScreen() {
+  const insets = useSafeAreaInsets();
   const threadId = useActiveThreadId();
   const scores = useProjectScores(threadId ?? null) as ProjectScores | undefined | null;
   const stats = useUserStats();
@@ -410,11 +412,11 @@ export function FocusScreen() {
   return (
     <View className="flex-1" style={{ backgroundColor: colors.brand.bg }}>
       <FocusAwareStatusBar />
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <Text style={styles.headerTitle}>Ideo</Text>
+      </View>
       <ScrollView>
-        <View className="px-4 pt-16 pb-8">
-          <Text className="mb-6 text-2xl font-bold" style={{ color: colors.brand.dark }}>
-            Focus
-          </Text>
+        <View className="px-6 pb-8">
           <LevelHeader stats={stats} onStreakPress={() => setShowStreakModal(true)} />
           {/* ScoreGlobalBanner désactivé temporairement — le score pondéré
               sera réintégré quand la logique de pondération sera finalisée */}
@@ -465,6 +467,20 @@ export function FocusScreen() {
 }
 
 const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 12,
+  },
+  headerTitle: {
+    color: colors.brand.dark,
+    fontSize: 24,
+    fontWeight: '700',
+    textShadowColor: 'rgba(255,255,255,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 0,
+  },
   challengeCard: {
     borderRadius: 12,
     borderWidth: 1,

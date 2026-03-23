@@ -3,7 +3,8 @@ import type { Artifact, ArtifactType } from './api';
 import type { InsightsTab } from './components/insights-segment-control';
 
 import * as React from 'react';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, FocusAwareStatusBar, ScrollView, Text, View } from '@/components/ui';
 import { useModal } from '@/components/ui/modal';
 import { translate } from '@/lib/i18n';
@@ -61,6 +62,7 @@ function ArtifactList({
 }
 
 export function InsightsScreen() {
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = React.useState<InsightsTab>('validation');
   const [selectedArtifact, setSelectedArtifact] = React.useState<Artifact | null>(null);
   const detailSheet = useModal();
@@ -75,20 +77,12 @@ export function InsightsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.brand.bg }}>
       <FocusAwareStatusBar />
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <Text style={styles.headerTitle}>Ideo</Text>
+      </View>
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 60, paddingBottom: 120 }}
+        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 120 }}
       >
-        <Text
-          style={{
-            fontSize: 22,
-            fontWeight: '700',
-            color: colors.brand.dark,
-            marginBottom: 20,
-          }}
-        >
-          {translate('insights.tab_label' as any)}
-        </Text>
-
         <InsightsSegmentControl activeTab={activeTab} onChange={setActiveTab} />
 
         <ArtifactList type={activeType} onSelect={handleSelect} />
@@ -101,3 +95,20 @@ export function InsightsScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 12,
+  },
+  headerTitle: {
+    color: colors.brand.dark,
+    fontSize: 24,
+    fontWeight: '700',
+    textShadowColor: 'rgba(255,255,255,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 0,
+  },
+});
