@@ -10,8 +10,8 @@ type GitHubRepo = {
 type GitHubPushEvent = {
   type: string;
   created_at: string;
-  ref: string; // "refs/heads/feat/web-search"
   payload: {
+    ref: string; // "refs/heads/feat/web-search"
     commits: Array<{ message: string; sha: string }>;
   };
 };
@@ -23,6 +23,11 @@ function parseBranchName(ref: string) {
 function formatDate(iso: string) {
   return `${iso.replace('T', ' ').replace('Z', ' UTC').slice(0, 19)} UTC`;
 }
+
+type GitHubCommit = {
+  commit: { message: string };
+  sha: string;
+};
 
 export async function githubFetch(repoUrl: string, token?: string): Promise<string> {
   const match = repoUrl.match(/github\.com\/([^/]+)\/([^/\s?#]+)/);
@@ -49,24 +54,37 @@ export async function githubFetch(repoUrl: string, token?: string): Promise<stri
 
   const r = await repoRes.json() as GitHubRepo;
 
-  // Extract recent push activity across all branches
+  // Extract deduplicated recently active branches from Events API
   const events = eventsRes.ok ? await eventsRes.json() as GitHubPushEvent[] : [];
-  const pushEvents = events.filter(e => e.type === 'PushEvent').slice(0, 10);
+  const pushEvents = events.filter(e => e.type === 'PushEvent' && e.payload.ref).slice(0, 10);
 
-  // Build a deduplicated list of recently active branches (most recent first)
   const seenBranches = new Set<string>();
-  const activeBranches: Array<{ branch: string; date: string; commits: string[] }> = [];
+  const activeBranchNames: Array<{ branch: string; date: string }> = [];
   for (const ev of pushEvents) {
-    const branch = parseBranchName(ev.ref);
+    const branch = parseBranchName(ev.payload.ref);
     if (!seenBranches.has(branch)) {
       seenBranches.add(branch);
-      activeBranches.push({
-        branch,
-        date: formatDate(ev.created_at),
-        commits: ev.payload.commits.slice(0, 3).map(c => c.message.split('\n')[0]),
-      });
+      activeBranchNames.push({ branch, date: formatDate(ev.created_at) });
     }
   }
+
+  // Fetch actual commits from the Commits API for the 3 most active branches
+  const topBranches = activeBranchNames.slice(0, 3);
+  const branchCommits = await Promise.all(
+    topBranches.map(async ({ branch, date }) => {
+      const commitsRes = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/commits?sha=${encodeURIComponent(branch)}&per_page=3`,
+        { headers },
+      );
+      const commits: string[] = [];
+      if (commitsRes.ok) {
+        const data = await commitsRes.json() as GitHubCommit[];
+        for (const c of data)
+          commits.push(c.commit.message.split('\n')[0]);
+      }
+      return { branch, date, commits };
+    }),
+  );
 
   const lines: string[] = [
     `**${owner}/${repo}** — ${r.description ?? 'no description'}`,
@@ -75,10 +93,10 @@ export async function githubFetch(repoUrl: string, token?: string): Promise<stri
     `Default branch: ${r.default_branch}`,
   ];
 
-  if (activeBranches.length > 0) {
+  if (branchCommits.length > 0) {
     lines.push('');
     lines.push('Recently active branches:');
-    for (const b of activeBranches.slice(0, 3)) {
+    for (const b of branchCommits) {
       lines.push(`- **${b.branch}** (${b.date})`);
       for (const msg of b.commits)
         lines.push(`  · ${msg}`);

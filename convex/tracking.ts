@@ -11,14 +11,25 @@ import { scrapeUrl } from './tools/scrape/index';
 // Tracking agent — one-shot per project, thread stored for observability
 // ---------------------------------------------------------------------------
 
-const TRACKING_SYSTEM_PROMPT = `You are a daily tracker for vibe coders. Your job is to generate a concise daily stand-up report by:
-1. Reviewing today's conversation activity (provided by the user)
-2. Checking the user's recent TLDRs to avoid redundant context
-3. Scraping each available project link using the scrapeUrl tool (one call per link)
-4. Synthesizing everything into a structured markdown report
-5. Calling saveReport with the full report and a 2-3 sentence tldr for tomorrow's context
+const TRACKING_SYSTEM_PROMPT = `You are a GitHub-focused daily tracker for vibe coders.
 
-Be concise and actionable. Focus on what changed today vs previous reports.`;
+Your job:
+1. Call scrapeUrl with the GitHub URL provided in "GitHub Repository" — this returns repo stats, active branches, and recent commits via the GitHub Events API
+2. Identify the most recently active branch (not necessarily main)
+3. Summarize what changed since the last report (commits, new branches, open issues trend, stars)
+4. Flag any risks: no commits in 7+ days, spike in open issues, branch divergence from main
+5. Call saveReport with the full structured report and a 2-3 sentence tldr for tomorrow's context
+
+Report format (markdown):
+## Daily Tracking — [date]
+**Active branch:** [branch name] · [last push time]
+**Recent commits:**
+- [message] ([date])
+**Repo health:** Stars: X (+/-N) | Forks: X | Open issues: X
+**Signals:** [key observations]
+**Risks:** [if any]
+
+Keep it concise — this is a developer standup, not a blog post.`;
 
 export const trackingAgent = new Agent(components.agent, {
   name: 'Tracking Agent',
@@ -35,42 +46,42 @@ type TrackingMessage = { role: 'user' | 'assistant'; content: string; createdAt:
 
 function buildTrackingPrompt({
   projectName,
+  githubUrl,
+  recentTldrs,
   todayMessages,
-  availableLinks,
-  today,
 }: {
   projectName: string;
+  githubUrl: string;
+  recentTldrs: string[];
   todayMessages: TrackingMessage[];
-  availableLinks: Record<string, string>;
-  today: string;
 }): string {
   const lines: string[] = [
-    `# Daily Tracking Report — ${today}`,
-    `**Project:** ${projectName}`,
-    '',
+    `Project: ${projectName}`,
+    `GitHub Repository: ${githubUrl}`,
   ];
 
-  if (Object.keys(availableLinks).length > 0) {
-    lines.push('## Available Links to Monitor');
-    for (const [platform, url] of Object.entries(availableLinks)) {
-      lines.push(`- ${platform}: ${url}`);
-    }
+  if (recentTldrs.length > 0) {
     lines.push('');
+    lines.push('Recent context (from previous reports):');
+    for (const tldr of recentTldrs) {
+      lines.push(tldr);
+    }
   }
 
   if (todayMessages.length > 0) {
-    lines.push('## Today\'s Conversations');
+    lines.push('');
+    lines.push('Today\'s activity:');
     for (const msg of todayMessages) {
       lines.push(`**${msg.role}:** ${msg.content.slice(0, 500)}`);
     }
-    lines.push('');
   }
   else {
-    lines.push('*No conversations today.*');
     lines.push('');
+    lines.push('No conversation activity today.');
   }
 
-  lines.push('Please generate the daily tracking report now. Call saveReport when done.');
+  lines.push('');
+  lines.push('Call scrapeUrl with the GitHub URL above, then call saveReport.');
   return lines.join('\n');
 }
 
@@ -150,7 +161,7 @@ export const generateDailyTrackingReports = internalAction({
       if (existing)
         continue;
 
-      const [todayMessages, profile] = await Promise.all([
+      const [todayMessages, profile, recentTldrEntries] = await Promise.all([
         ctx.runQuery(internal.chat.getMessagesForDate, {
           threadId: project.threadId,
           date: today,
@@ -158,32 +169,29 @@ export const generateDailyTrackingReports = internalAction({
         ctx.runQuery(internal.userProfiles.getProfileByUserId, {
           userId: project.userId,
         }),
+        ctx.runQuery(internal.artifacts.getRecentTldrs, {
+          userId: project.userId,
+          type: 'tracking',
+          limit: 3,
+        }),
       ]);
 
-      // Build links map: project-specific first, fallback to profile social links
-      const availableLinks: Record<string, string> = {};
-      if (project.projectLinks) {
-        const pl = project.projectLinks;
-        if (pl.github)
-          availableLinks.github = pl.github;
-        if (pl.website)
-          availableLinks.website = pl.website;
-        if (pl.tiktok)
-          availableLinks.tiktok = pl.tiktok;
-        if (pl.instagram)
-          availableLinks.instagram = pl.instagram;
+      // GitHub-only: skip projects without a GitHub URL or token
+      const githubUrl = project.projectLinks?.github;
+      const githubToken = profile?.githubToken;
+
+      if (!githubUrl || !githubToken) {
+        console.log(`[tracking] Skipping project ${project._id} (${project.name ?? 'unnamed'}): ${!githubUrl ? 'no GitHub URL' : 'no GitHub token'}`);
+        continue;
       }
-      else if (profile?.socialLinks) {
-        for (const link of profile.socialLinks) {
-          availableLinks[link.platform] = link.url;
-        }
-      }
+
+      const recentTldrs = recentTldrEntries.map((e: { date: string; tldr: string }) => `[${e.date}] ${e.tldr}`);
 
       const prompt = buildTrackingPrompt({
         projectName: project.name ?? 'Unnamed project',
+        githubUrl,
+        recentTldrs,
         todayMessages: todayMessages as TrackingMessage[],
-        availableLinks,
-        today,
       });
 
       // Ensure persistent tracking thread for this project
@@ -206,7 +214,7 @@ export const generateDailyTrackingReports = internalAction({
             runMutation: ctx.runMutation.bind(ctx),
             runQuery: ctx.runQuery.bind(ctx),
             userId: project.userId,
-            githubToken: profile?.githubToken,
+            githubToken,
           }),
           saveReport: buildSaveReportTool(ctx.runMutation.bind(ctx), project.userId, trackingThreadId),
         },
