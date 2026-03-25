@@ -78,6 +78,10 @@ export default defineSchema({
     lastRejectionMessage: v.optional(v.string()),
     failed: v.optional(v.boolean()),
     carriedOver: v.optional(v.boolean()),
+    validationType: v.optional(v.union(v.literal('conversation'), v.literal('github'))),
+    completedByCron: v.optional(v.boolean()),
+    seenAt: v.optional(v.number()),
+    completionNote: v.optional(v.string()),
   }).index('by_userId_date', ['userId', 'date']),
 
   goals: defineTable({
