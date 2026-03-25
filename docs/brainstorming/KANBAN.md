@@ -156,78 +156,187 @@
 
 ---
 
-## EPIC J — Challenges GitHub-Driven
-> P3
+## EPIC J — Challenges "Move the Needle"
+> P2–P4
+> **Révisé 2026-03-25** — refonte complète : max 3 actifs, slot fill dynamique, validationType extensible, tracking agent enrichi, UX "pendant ton absence"
+
+### Décisions techniques
+
+**Workpool vs Workflow :**
+- `@convex-dev/workpool` → fan-out (N utilisateurs en parallèle, concurrence contrôlée) — idéal pour la génération de challenges
+- `@convex-dev/workflow` → pipeline séquentiel durable (chaque étape checkpointée) — idéal pour le tracking par projet
+- **V1 :** pas de migration. L'agent `@convex-dev/agent` avec `maxSteps: 10` suffit. Workpool + Workflow = upgrade futur (J-07, J-08).
+
+**Modèles IA :**
+- Challenge generation : Haiku (prompt simple, JSON schema clair)
+- Tracking + score analysis : `claude-sonnet-4-6` déjà en place, correct pour le raisonnement sur commits
+- Slot refill temps-réel : Haiku one-shot
+
+**validationType — méthode de validation (extensible) :**
+`validationType` décrit **comment vérifier**, pas le contenu du challenge. Le même challenge "Push un commit" a `validationType: 'github'`. Demain "Dessine ton écran" pourrait avoir `validationType: 'figma'`. C'est indépendant du `dimension` (développement/validation/design/distribution).
 
 ---
 
-### J-01 · Challenge templates GitHub [P3]
+### Schéma — nouveaux champs `dailyChallenges`
 
-**En tant qu'** agent qui génère des défis quotidiens
-**Je veux** proposer des challenges liés à l'activité GitHub
-**Afin que** la progression soit mesurable objectivement
+Fichier : `convex/schema.ts` ligne 68
+
+```
+validationType?: 'conversation' | 'github'   — comment vérifier (extensible)
+completedByCron?: boolean                     — true = complété par le tracking agent
+seenAt?: number                               — timestamp quand le modal l'a affiché
+completionNote?: string                       — "Push détecté sur feat/api à 23:14" (du tracking agent)
+```
+
+---
+
+### J-00 · Cap max 3 challenges actifs [P2]
+
+**En tant qu'** utilisateur
+**Je veux** avoir toujours exactement 3 défis actifs (ni plus, ni moins)
+**Afin de** rester focalisé sur ce qui fait avancer le projet
 
 **Critères d'acceptation**
-- [ ] Ajouter des templates GitHub dans `SYSTEM_CHALLENGE_POOL` de `convex/gamification.ts` :
-  - "Push au moins 1 commit sur ta branche active aujourd'hui"
-  - "Ouvre une PR ou mets à jour une PR existante"
-  - "Ferme au moins 1 issue ouverte"
-  - "Crée une nouvelle branche pour la prochaine feature"
-- [ ] Le cron `generateDailyChallenges` sélectionne ces templates si le projet a un lien GitHub configuré
-- [ ] Les challenges GitHub sont distingués par un champ `validationType: 'github' | 'conversation'` dans le schéma
-- [ ] Maximum 10 challenges actifs par jour — dès qu'un challenge est accompli, un slot se libère
+- [ ] `generateDailyChallenges` (crons.ts) : budget = `3 - carriedOverLabels.length`. Si 2 carry-overs → générer 1 seul nouveau.
+- [ ] `generatePersonalizedChallenges` (challenges.ts) : accepter param `maxNew: number`, remplacer `slice(0, 4)` par `slice(0, maxNew)`.
+- [ ] `getDailyChallenges` (gamification.ts) : remplacer `.take(10)` par filtre `!failed` + `.take(3)` sur les actifs.
+- [ ] `getDailyChallengesInternal` : idem.
 
-**Notes techniques:** `convex/gamification.ts` — `SYSTEM_CHALLENGE_POOL` (7 templates génériques actuellement). Ajouter champ `validationType` dans `convex/schema.ts` table `dailyChallenges`.
+**Notes techniques:** `convex/crons.ts:generateDailyChallenges`, `convex/challenges.ts:generatePersonalizedChallenges`, `convex/gamification.ts:getDailyChallenges`.
 
 ---
 
-### J-02 · Validation des challenges via GitHub [P3]
+### J-01 · Slot fill dynamique à la complétion [P2]
 
-**En tant qu'** utilisateur qui essaie de valider un challenge GitHub
-**Je veux** que l'agent vérifie mon activité GitHub
-**Afin que** la validation soit objective et non auto-déclarée
+**En tant qu'** utilisateur qui vient de compléter un challenge
+**Je veux** qu'un nouveau défi apparaisse automatiquement
+**Afin d'** avoir toujours 3 défis actifs
 
 **Critères d'acceptation**
-- [ ] `validateAndCompleteDailyChallenge` dans `convex/gamification.ts` : si `validationType === 'github'`, appeler l'API GitHub au lieu de lire la conversation
-- [ ] Vérification : commit sur branche active dans les dernières 24h → challenge "commit" auto-complété
-- [ ] Si le token GitHub n'est pas configuré → fallback sur la validation par conversation (comportement actuel)
-- [ ] Cooldown 30 min conservé si la vérification GitHub échoue
+- [ ] `completeDailyChallenge` (public) : après patch `completed: true`, appelle `ctx.scheduler.runAfter(0, internal.challenges.refillChallengeSlotsForUser, { userId, date })`.
+- [ ] `completeDailyChallengeInternal` : idem, sauf si `completedByCron === true` (éviter double-trigger depuis le cron).
+- [ ] Nouvelle action `refillChallengeSlotsForUser` (challenges.ts) :
+  1. Compte challenges actifs du jour (`completed === false && failed !== true`)
+  2. Si count < 3 → `generatePersonalizedChallenges(maxNew = 3 - count)`
+  3. Insère via `createDailyChallengeInternal`
+  4. Guard anti-doublon : exclure les labels déjà utilisés aujourd'hui
 
-**Notes techniques:** Réutiliser les primitives E-04. Déclenché depuis `convex/gamification.ts:validateAndCompleteDailyChallenge`.
+**Hors scope V1 :** slot fill via le chat agent (à prévoir : exposer `createDailyChallengeInternal` comme tool agent si besoin futur).
+
+**Notes techniques:** `convex/gamification.ts:completeDailyChallenge`, `convex/challenges.ts` (nouvelle action).
 
 ---
 
-### J-03 · Tracking cron → mise à jour des challenges [P3]
+### J-02 · validationType — méthode de validation extensible [P3]
+
+**En tant qu'** agent qui génère des challenges
+**Je veux** attribuer à chaque challenge comment il sera vérifié
+**Afin que** le système de validation soit extensible à d'autres tools (Figma, screenshot, URL…)
+
+**Critères d'acceptation**
+- [ ] `generatePersonalizedChallenges` accepte `hasGitHub: boolean`. Si true → le prompt IA indique que des challenges GitHub-vérifiables sont possibles.
+- [ ] Le JSON retourné par Haiku inclut `validationType: 'conversation' | 'github'` (optionnel, défaut `'conversation'`).
+- [ ] `crons.ts` passe `hasGitHub: !!project.projectLinks?.github` depuis `getActiveProjectContextForUser`.
+- [ ] `createDailyChallengeInternal` accepte et persiste `validationType`.
+- [ ] Schéma migré (J-00 prérequis).
+
+**Exemples :**
+- `hasGitHub: true` + weakest=development → "Push un commit sur ta branche active" (`validationType: 'github'`)
+- `hasGitHub: false` → "Décris le parcours utilisateur principal" (`validationType: 'conversation'`)
+
+**Notes techniques:** `convex/challenges.ts:generatePersonalizedChallenges`, `convex/crons.ts`, `convex/gamification.ts:createDailyChallengeInternal`.
+
+---
+
+### J-03 · Tracking agent → mise à jour des scores projet [P3]
 
 **En tant que** cron de tracking qui analyse l'activité GitHub
-**Je veux** pouvoir marquer automatiquement des challenges comme complétés
-**Afin que** l'utilisateur soit récompensé sans avoir à le déclarer manuellement
+**Je veux** mettre à jour les scores radar du projet à partir des commits détectés
+**Afin que** l'avancement du projet reflète l'activité réelle
 
 **Critères d'acceptation**
-- [ ] L'agent tracking a accès à un tool `completeChallenge` (en plus de `scrapeUrl` et `saveReport`)
-- [ ] L'agent compare les commits détectés avec les challenges GitHub actifs du jour
-- [ ] Si un commit correspond à un challenge (ex. branche + message), il le complète automatiquement
-- [ ] L'artefact de tracking mentionne les challenges auto-complétés dans la section "Signals"
+- [ ] Nouveau tool `updateProjectScores` dans `convex/tracking.ts` :
+  - `inputSchema`: `{ validation?, design?, development?, distribution? }` (0-100 chacun)
+  - `execute`: appelle `internal.gamification.updateProjectScores({ threadId, scores })`
+- [ ] TRACKING_SYSTEM_PROMPT mis à jour : step 3.5 — "Call updateProjectScores with estimated dimension scores based on GitHub activity (commits → development, issues closed → validation, etc.)"
+- [ ] L'agent estime des **deltas** (pas des absolus) basés sur l'activité observée.
+- [ ] Ordre tool calls dans le prompt : `scrapeUrl` → `getGitHubCommits?` → `updateProjectScores` → `completeChallenge*` → `saveReport`
 
-**Notes techniques:** `convex/tracking.ts` — ajouter un 3e tool `completeChallenge` qui appelle `internal.gamification.completeDailyChallenge`. Passer les challenges du jour dans le prompt.
+**Notes techniques:** `convex/tracking.ts:buildScrapeUrlTool` zone, `convex/gamification.ts:updateProjectScores` déjà en place.
 
 ---
 
-### J-04 · Modal in-app sur challenges auto-complétés [P3]
+### J-04 · Tracking agent → auto-validation des challenges [P3]
 
-**En tant qu'** utilisateur qui ouvre l'application
-**Je veux** voir un récapitulatif des challenges complétés automatiquement (par le cron GitHub) depuis ma dernière visite
-**Afin d'** être félicité et de comprendre pourquoi j'ai reçu des points
+**En tant que** cron de tracking qui détecte des commits
+**Je veux** pouvoir compléter automatiquement les challenges dont la condition est remplie
+**Afin que** l'utilisateur soit récompensé sans déclaration manuelle
 
 **Critères d'acceptation**
-- [ ] Chaque challenge complété par le cron dispose d'un champ `seenAt?: number` dans la table `dailyChallenges`
-- [ ] À l'ouverture de l'app (`recordAppOpen`), vérifier s'il existe des challenges auto-complétés non vus
-- [ ] Si oui → afficher un modal de félicitation (pattern identique à `DailyRitualModal` ou `LevelUpModal`) listant les challenges + points gagnés
-- [ ] Si plusieurs challenges : liste groupée dans le même modal
-- [ ] Marquer `seenAt` dès que le modal est affiché
+- [ ] Nouveau tool `completeChallenge` dans `convex/tracking.ts` :
+  - `inputSchema`: `{ challengeId: string, completionNote: string }` (1 phrase du type "Push on feat/api at 22:14")
+  - `execute`: appelle `internal.gamification.completeDailyChallengeFromCron({ challengeId, userId, completionNote })`
+- [ ] Nouvelle mutation `completeDailyChallengeFromCron` (gamification.ts) : même logique que `completeDailyChallengeInternal` + `completedByCron: true` + `completionNote`. Ne déclenche **pas** de slot refill.
+- [ ] `buildTrackingPrompt` injecte les challenges actifs `validationType === 'github'` du jour dans le prompt :
+  ```
+  Active challenges today (validationType: github):
+  - [id: xxx] "Push un commit sur ta branche active"
+  ```
+  Requête : `getDailyChallengesInternal` filtré `validationType === 'github' && !completed`
+- [ ] L'artefact de tracking mentionne les challenges auto-complétés dans la section "Signals".
 
-**Hors scope :** push notifications (infrastructure à prévoir séparément)
+**Notes techniques:** `convex/tracking.ts:buildTrackingPrompt` + nouveaux tool builders, `convex/gamification.ts`.
 
-**Notes techniques:** `convex/schema.ts` — ajouter `seenAt?: number` sur la table `dailyChallenges`. `convex/gamification.ts:recordAppOpen` — ajouter requête des challenges non vus. Pattern UI : `src/features/idea/components/daily-ritual-modal.tsx`.
+---
+
+### J-05 · Unseen completions — queries + mutations [P3]
+
+**En tant qu'** utilisateur qui rouvre l'app après le cron de 23h
+**Je veux** savoir que le tracking agent a complété des challenges pendant mon absence
+**Afin d'** être informé et récompensé
+
+**Critères d'acceptation**
+- [ ] Query publique `getUnseenCronCompletions` (gamification.ts) : retourne les challenges où `completed === true && completedByCron === true && seenAt === undefined` pour la date du jour.
+- [ ] Mutation publique `markChallengesAsSeen(challengeIds)` : patch `seenAt: Date.now()` sur chaque id.
+- [ ] `recordAppOpen` retourne `unseenCount: number` (count des completions non vues) en plus de l'existant.
+- [ ] Hook React `useUnseenCronCompletions()` dans `src/features/focus/api.ts`.
+
+**Notes techniques:** `convex/gamification.ts:recordAppOpen` (ligne 843), `src/features/focus/api.ts`.
+
+---
+
+### J-06 · DailyRitualModal — section "Pendant ton absence" [P3]
+
+**En tant qu'** utilisateur qui ouvre l'app après le cron
+**Je veux** voir une section dédiée dans la Daily Ritual Modal listant les challenges complétés automatiquement
+**Afin d'** être félicité et de comprendre ce qui s'est passé
+
+**Critères d'acceptation**
+- [ ] `DailyRitualModal` accepte une nouvelle prop `unseenCompletions: ChallengeDoc[]`.
+- [ ] Section **"Pendant ton absence"** (label uppercase, en haut avant streak) — visible seulement si `unseenCompletions.length > 0` :
+  - Pour chaque challenge : label, badge `+{points}` vert, `completionNote` en italique si présente
+- [ ] Section existante "challenges" renommée **"Prochains défis"** — filtrée sur `!completed && !failed`.
+- [ ] À la fermeture du modal (`onClose`) : appelle `markChallengesAsSeen(unseenCompletions.map(c => c._id))`.
+- [ ] `idea-screen.tsx` : si `recordAppOpen` retourne `unseenCount > 0` → déclenche l'ouverture du modal (réutilise `setShowStandupSplash(true)` ou setter dédié).
+
+**Hors scope :** push notifications.
+
+**Notes techniques:** `src/features/idea/components/daily-ritual-modal.tsx` (l.87), `src/features/idea/idea-screen.tsx` (l.116 `useStandupTrigger`).
+
+---
+
+### J-07 · Workpool fan-out pour génération challenges [P4]
+
+**Future upgrade** — Remplacer le for-loop séquentiel de `generateDailyChallenges` par `@convex-dev/workpool` pour traiter N utilisateurs en parallèle avec concurrence contrôlée (éviter les rate limits LLM).
+
+**Notes techniques:** `@convex-dev/workpool` — `pool.enqueueAction(ctx, fn, args)`. Installer : `npx convex add workpool`.
+
+---
+
+### J-08 · Workflow pipeline pour tracking [P4]
+
+**Future upgrade** — Refactorer `generateDailyTrackingReports` en pipeline `@convex-dev/workflow` : step 1 fetchGitHub → step 2 updateProjectScores → step 3 completeChallenge → step 4 saveReport. Chaque étape est checkpointée et retryable indépendamment.
+
+**Notes techniques:** `@convex-dev/workflow`. Installer : `npx convex add workflow`.
 
 ---
