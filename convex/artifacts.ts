@@ -77,6 +77,17 @@ export const getTrackingArtifactForDate = internalQuery({
   },
 });
 
+export const getLatestTrackingArtifact = internalQuery({
+  args: { projectId: v.id('projects') },
+  handler: async (ctx, { projectId }) => {
+    return ctx.db
+      .query('artifacts')
+      .withIndex('by_project_type', q => q.eq('projectId', projectId).eq('type', 'tracking'))
+      .order('desc')
+      .first();
+  },
+});
+
 export const getRecentTldrs = internalQuery({
   args: {
     userId: v.string(),
