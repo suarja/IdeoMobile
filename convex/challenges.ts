@@ -2,6 +2,7 @@
 
 import { generateText } from 'ai';
 import { v } from 'convex/values';
+import { internal } from './_generated/api';
 import { internalAction } from './_generated/server';
 
 // ---------------------------------------------------------------------------
@@ -127,3 +128,55 @@ export function utcDateString(): string {
   const d = String(now.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
+
+// ---------------------------------------------------------------------------
+// Dynamic slot fill — called after a challenge is completed
+// ---------------------------------------------------------------------------
+
+export const refillChallengeSlotsForUser = internalAction({
+  args: { userId: v.string(), date: v.string() },
+  handler: async (ctx, { userId, date }) => {
+    // Count currently active (non-completed, non-failed) challenges
+    const allToday: Array<{ label: string; completed: boolean; failed?: boolean; dimension?: string }> = await ctx.runQuery(
+      internal.gamification.getDailyChallengesInternal,
+      { userId, date },
+    );
+    const activeCount = allToday.filter(c => !c.completed && c.failed !== true).length;
+    if (activeCount >= 3)
+      return; // already at cap
+
+    const maxNew = 3 - activeCount;
+    const usedLabels = allToday.map(c => c.label);
+
+    const projectContext: {
+      scores: { validation: number; design: number; development: number; distribution: number } | null;
+      lastSessionSummary: string | null;
+    } | null = await ctx.runQuery(
+      internal.gamification.getActiveProjectContextForUser,
+      { userId },
+    );
+
+    const { newChallenges } = await ctx.runAction(
+      internal.challenges.generatePersonalizedChallenges,
+      {
+        userId,
+        maxNew,
+        yesterdayChallenges: [], // no carry-overs during refill
+        ...(projectContext?.scores ? { projectScores: projectContext.scores } : {}),
+        ...(projectContext?.lastSessionSummary ? { lastSessionSummary: projectContext.lastSessionSummary } : {}),
+      },
+    );
+
+    for (const challenge of newChallenges) {
+      if (usedLabels.includes(challenge.label))
+        continue; // dedup
+      await ctx.runMutation(internal.gamification.createDailyChallengeInternal, {
+        userId,
+        label: challenge.label,
+        points: challenge.points,
+        date,
+        ...(challenge.dimension ? { dimension: challenge.dimension } : {}),
+      });
+    }
+  },
+});

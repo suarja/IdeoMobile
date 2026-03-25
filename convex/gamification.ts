@@ -238,6 +238,10 @@ export const completeDailyChallenge = mutation({
 
     await ctx.db.patch(challengeId, { completed: true, completedAt: Date.now() });
     await grantPoints(ctx, userId, challenge.points);
+    await ctx.scheduler.runAfter(0, internal.challenges.refillChallengeSlotsForUser, {
+      userId,
+      date: challenge.date,
+    });
   },
 });
 
@@ -491,6 +495,10 @@ export const completeDailyChallengeInternal = internalMutation({
       return;
     await ctx.db.patch(challengeId, { completed: true, completedAt: Date.now() });
     await grantPoints(ctx, userId, challenge.points);
+    await ctx.scheduler.runAfter(0, internal.challenges.refillChallengeSlotsForUser, {
+      userId,
+      date: challenge.date,
+    });
   },
 });
 
