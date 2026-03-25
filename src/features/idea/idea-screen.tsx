@@ -15,7 +15,7 @@ import { translate } from '@/lib/i18n';
 import { storage } from '@/lib/storage';
 
 import { api } from '../../../convex/_generated/api';
-import { useUserStats } from '../focus/api';
+import { useUnseenCronCompletions, useUserStats } from '../focus/api';
 import { WhisperModelBottomSheet } from '../settings/components/whisper-model-bottom-sheet';
 import { useActiveThread, useMessages } from './api';
 import { AgentMarkdown } from './components/agent-markdown';
@@ -84,6 +84,7 @@ export function IdeaScreen() {
   const activeThread = useActiveThread();
   const userStats = useUserStats();
   const messages = useMessages(activeThread?.threadId ?? null);
+  const unseenCompletions = useUnseenCronCompletions();
   const recordAppOpen = useMutation(api.gamification.recordAppOpen);
 
   // Reactive PointsBanner: tracks totalPoints delta from any source (agent, challenges, etc.)
@@ -129,6 +130,10 @@ export function IdeaScreen() {
             storage.set('@ideo_last_streak_modal_date', today);
             setShowStreakModal(true);
           }
+        }
+        // Open ritual modal if cron completed challenges while user was away
+        if ((result.unseenCount ?? 0) > 0) {
+          setShowStandupSplash(true);
         }
       })
       .catch(console.error);
@@ -417,6 +422,7 @@ export function IdeaScreen() {
         visible={showStandupSplash}
         onClose={() => setShowStandupSplash(false)}
         onStartStandup={() => setShowStandupSplash(false)}
+        unseenCompletions={unseenCompletions ?? []}
       />
     </KeyboardAvoidingView>
   );

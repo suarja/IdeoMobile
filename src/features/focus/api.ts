@@ -61,6 +61,15 @@ export function useAddGoal() {
   return useMutation(api.gamification.addGoal);
 }
 
+export function useUnseenCronCompletions() {
+  const { isAuthenticated } = useConvexAuth();
+  return useQuery(api.gamification.getUnseenCronCompletions, isAuthenticated ? {} : 'skip');
+}
+
+export function useMarkChallengesAsSeen() {
+  return useMutation(api.gamification.markChallengesAsSeen);
+}
+
 export function localDateString(): string {
   const now = new Date();
   const y = now.getFullYear();

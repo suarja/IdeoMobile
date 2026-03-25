@@ -5,7 +5,8 @@
     "cta": "ابدأ وقفتي اليومية →",
     "greeting": "صباح الخير ✦",
     "mood_label": "الحالة المزاجية",
-    "points_to_next": "{{points}} نقطة للوصول إلى {{icon}} {{name}}"
+    "points_to_next": "{{points}} نقطة للوصول إلى {{icon}} {{name}}",
+    "unseen_label": "أثناء غيابك"
   },
   "focus": {
     "daily_objective": "هدف اليوم",

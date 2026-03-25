@@ -5,7 +5,8 @@
     "cta": "Start my standup →",
     "greeting": "Good morning ✦",
     "mood_label": "Mood Check",
-    "points_to_next": "{{points}} pts to go → {{icon}} {{name}}"
+    "points_to_next": "{{points}} pts to go → {{icon}} {{name}}",
+    "unseen_label": "While You Were Away"
   },
   "focus": {
     "daily_objective": "Today's objective",

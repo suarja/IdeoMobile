@@ -1,7 +1,9 @@
 /* eslint-disable max-lines-per-function */
 import type { Icon } from 'phosphor-react-native';
+import type { Doc } from '../../../../convex/_generated/dataModel';
 import { Ionicons } from '@expo/vector-icons';
 import {
+  CheckCircle,
   Fire,
   Smiley,
   SmileyMeh,
@@ -18,6 +20,7 @@ import { AnimatedProgressBar } from '@/components/ui/animated-progress-bar';
 import {
   localDateString,
   useDailyChallenges,
+  useMarkChallengesAsSeen,
   useUserStats,
 } from '@/features/focus/api';
 import { LEVEL_ICON_MAP, LevelBadge } from '@/features/focus/components/level-header';
@@ -28,6 +31,7 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onStartStandup: () => void;
+  unseenCompletions?: Doc<'dailyChallenges'>[];
 };
 
 const MOODS: { icon: Icon; score: number }[] = [
@@ -84,11 +88,12 @@ function getEffectiveActiveDays(activeDays: string[], currentStreak: number): st
   return Array.from(effectiveSet);
 }
 
-export function DailyRitualModal({ visible, onClose, onStartStandup }: Props) {
+export function DailyRitualModal({ visible, onClose, onStartStandup, unseenCompletions = [] }: Props) {
   const [selectedMood, setSelectedMood] = useState<number | null>(null);
   const stats = useUserStats();
   const challenges = useDailyChallenges(localDateString());
   const saveDailyMood = useSaveDailyMood();
+  const markChallengesAsSeen = useMarkChallengesAsSeen();
   const insets = useSafeAreaInsets();
 
   const weekDays = getCurrentWeekDays();
@@ -110,6 +115,9 @@ export function DailyRitualModal({ visible, onClose, onStartStandup }: Props) {
 
   const handleClose = () => {
     saveMoodIfSelected();
+    if (unseenCompletions.length > 0) {
+      markChallengesAsSeen({ challengeIds: unseenCompletions.map(c => c._id) }).catch(console.error);
+    }
     onClose();
   };
 
@@ -140,6 +148,30 @@ export function DailyRitualModal({ visible, onClose, onStartStandup }: Props) {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* Unseen cron completions — "Pendant ton absence" */}
+          {unseenCompletions.length > 0 && (
+            <View style={[styles.section, styles.unseenSection]}>
+              <Text style={styles.sectionLabel}>{translate('daily_ritual.unseen_label')}</Text>
+              {unseenCompletions.map(c => (
+                <View key={c._id} style={styles.unseenRow}>
+                  <CheckCircle weight="fill" size={18} color="#4CAF50" style={{ flexShrink: 0 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.unseenChallengeLabel}>{c.label}</Text>
+                    {c.completionNote
+                      ? <Text style={styles.unseenNote}>{c.completionNote}</Text>
+                      : null}
+                  </View>
+                  <View style={styles.unseenPtsChip}>
+                    <Text style={styles.unseenPts}>
+                      +
+                      {c.points}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
           {/* Streak section */}
           <View style={styles.section}>
             <View style={styles.streakBlock}>
@@ -485,6 +517,43 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(255,255,255,0.7)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 0,
+  },
+  unseenSection: {
+    backgroundColor: 'rgba(76,175,80,0.06)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(76,175,80,0.12)',
+  },
+  unseenRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    gap: 10,
+  },
+  unseenChallengeLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#433831',
+    lineHeight: 20,
+  },
+  unseenNote: {
+    fontSize: 12,
+    color: '#A08060',
+    fontStyle: 'italic',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  unseenPtsChip: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 5,
+    backgroundColor: 'rgba(76,175,80,0.12)',
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  unseenPts: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#4CAF50',
   },
   ctaContainer: {
     paddingHorizontal: 24,

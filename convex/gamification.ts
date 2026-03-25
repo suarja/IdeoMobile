@@ -891,11 +891,16 @@ export const recordAppOpen = mutation({
     const now = Date.now();
     const todayStr = utcDateString();
 
-    const stats = await ctx.db
-      .query('userStats')
-      .withIndex('by_userId', q => q.eq('userId', userId))
-      .first();
+    const [stats, unseenCompletions] = await Promise.all([
+      ctx.db.query('userStats').withIndex('by_userId', q => q.eq('userId', userId)).first(),
+      ctx.db
+        .query('dailyChallenges')
+        .withIndex('by_userId_date', q => q.eq('userId', userId).eq('date', todayStr))
+        .collect()
+        .then(cs => cs.filter(c => c.completed && c.completedByCron === true && c.seenAt === undefined)),
+    ]);
 
+    const unseenCount = unseenCompletions.length;
     const activeDays = stats?.activeDays ?? [];
 
     // Check if the user has already opened the app today
@@ -903,7 +908,7 @@ export const recordAppOpen = mutation({
       // Still check if we should skip points based on lastSessionAt (3 hours)
       const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
       if (stats && stats.lastSessionAt && (now - stats.lastSessionAt) < THREE_HOURS_MS) {
-        return { skipped: true, activeDays, currentStreak: stats.currentStreak };
+        return { skipped: true, activeDays, currentStreak: stats.currentStreak, unseenCount };
       }
 
       const pointsEarned = 5;
@@ -911,7 +916,7 @@ export const recordAppOpen = mutation({
 
       // Only update lastSessionAt if returning points, but don't add duplicate activeDays
       await ctx.db.patch(stats!._id, { lastSessionAt: now });
-      return { skipped: false, pointsEarned, activeDays, currentStreak: stats!.currentStreak };
+      return { skipped: false, pointsEarned, activeDays, currentStreak: stats!.currentStreak, unseenCount };
     }
 
     // --- First open of the day ---
@@ -973,7 +978,40 @@ export const recordAppOpen = mutation({
       isNewStreakDay: true,
       currentStreak: newStreak,
       activeDays: newActiveDays,
+      unseenCount,
     };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Unseen cron completions
+// ---------------------------------------------------------------------------
+
+export const getUnseenCronCompletions = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      return [];
+    const userId = identity.subject;
+    const today = utcDateString();
+    const challenges = await ctx.db
+      .query('dailyChallenges')
+      .withIndex('by_userId_date', q => q.eq('userId', userId).eq('date', today))
+      .collect();
+    return challenges.filter(
+      c => c.completed && c.completedByCron === true && c.seenAt === undefined,
+    );
+  },
+});
+
+export const markChallengesAsSeen = mutation({
+  args: { challengeIds: v.array(v.id('dailyChallenges')) },
+  handler: async (ctx, { challengeIds }) => {
+    const now = Date.now();
+    for (const id of challengeIds) {
+      await ctx.db.patch(id, { seenAt: now });
+    }
   },
 });
 
