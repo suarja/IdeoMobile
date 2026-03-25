@@ -49,6 +49,7 @@ export const generateDailyChallenges = internalAction({
         internal.challenges.generatePersonalizedChallenges,
         {
           userId,
+          maxNew: 3, // AI caps output to this; enforced below after carry-overs are known
           ...(projectContext?.scores ? { projectScores: projectContext.scores } : {}),
           ...(projectContext?.lastSessionSummary ? { lastSessionSummary: projectContext.lastSessionSummary } : {}),
           yesterdayChallenges: yesterdayChallenges.map(c => ({
@@ -58,6 +59,9 @@ export const generateDailyChallenges = internalAction({
           })),
         },
       );
+
+      // Enforce cap of 3 total after carry-overs are resolved
+      const maxNew = Math.max(0, 3 - carriedOverLabels.length);
 
       // Mark non-carried-over old challenges as failed
       const failedIds = yesterdayChallenges
@@ -82,8 +86,8 @@ export const generateDailyChallenges = internalAction({
         });
       }
 
-      // Insert new personalized challenges
-      for (const challenge of newChallenges) {
+      // Insert new personalized challenges (capped to maxNew to enforce total of 3)
+      for (const challenge of newChallenges.slice(0, maxNew)) {
         await ctx.runMutation(internal.gamification.createDailyChallengeInternal, {
           userId,
           label: challenge.label,

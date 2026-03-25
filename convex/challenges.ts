@@ -1,6 +1,5 @@
 // Shared challenge pool, helpers, and AI-powered challenge generation.
 
-import { anthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
 import { v } from 'convex/values';
 import { internalAction } from './_generated/server';
@@ -17,6 +16,7 @@ type PersonalizedResult = {
 export const generatePersonalizedChallenges = internalAction({
   args: {
     userId: v.string(),
+    maxNew: v.number(),
     projectScores: v.optional(v.object({
       validation: v.number(),
       design: v.number(),
@@ -30,7 +30,7 @@ export const generatePersonalizedChallenges = internalAction({
       dimension: v.optional(v.string()),
     })),
   },
-  handler: async (_ctx, { projectScores, lastSessionSummary, yesterdayChallenges }): Promise<PersonalizedResult> => {
+  handler: async (_ctx, { maxNew, projectScores, lastSessionSummary, yesterdayChallenges }): Promise<PersonalizedResult> => {
     try {
       const weakestDimension = projectScores
         ? Object.entries(projectScores).sort(([, a], [, b]) => a - b)[0]?.[0]
@@ -62,7 +62,7 @@ Respond with ONLY valid JSON:
 Points: 50-150. dimension is optional: "validation", "design", "development", "distribution".`;
 
       const { text } = await generateText({
-        model: anthropic('claude-haiku-4-5-20251001'),
+        model: 'anthropic/claude-haiku-4.5',
         prompt,
       });
 
@@ -76,7 +76,7 @@ Points: 50-150. dimension is optional: "validation", "design", "development", "d
       const newChallenges = Array.isArray(parsed.newChallenges)
         ? (parsed.newChallenges as Array<{ label: string; points: number; dimension?: string }>)
             .filter(c => typeof c.label === 'string' && typeof c.points === 'number')
-            .slice(0, 4)
+            .slice(0, maxNew)
         : [];
 
       return { carriedOverLabels, newChallenges };

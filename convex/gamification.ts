@@ -1,5 +1,4 @@
 import type { MutationCtx, QueryCtx } from './_generated/server';
-import { anthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
 import { v } from 'convex/values';
 import { internal } from './_generated/api';
@@ -175,7 +174,7 @@ export const getDailyChallenges = query({
     return ctx.db
       .query('dailyChallenges')
       .withIndex('by_userId_date', q => q.eq('userId', userId).eq('date', date))
-      .take(10);
+      .take(3);
   },
 });
 
@@ -552,7 +551,7 @@ export const validateAndCompleteDailyChallenge = action({
     const conversationText = messages.map(m => `${m.role}: ${m.content}`).join('\n');
 
     const { text } = await generateText({
-      model: anthropic('claude-haiku-4-5-20251001'),
+      model: 'anthropic/claude-haiku-4.5',
       prompt: `
 Tu dois déterminer si l'utilisateur a complété le défi suivant : "${challenge.label}"
 
@@ -732,7 +731,7 @@ export const getDailyChallengesInternal = internalQuery({
     return ctx.db
       .query('dailyChallenges')
       .withIndex('by_userId_date', q => q.eq('userId', userId).eq('date', date))
-      .take(10);
+      .take(3);
   },
 });
 
