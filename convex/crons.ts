@@ -50,6 +50,7 @@ export const generateDailyChallenges = internalAction({
         {
           userId,
           maxNew: 3, // AI caps output to this; enforced below after carry-overs are known
+          hasGitHub: projectContext?.hasGitHub ?? false,
           ...(projectContext?.scores ? { projectScores: projectContext.scores } : {}),
           ...(projectContext?.lastSessionSummary ? { lastSessionSummary: projectContext.lastSessionSummary } : {}),
           yesterdayChallenges: yesterdayChallenges.map(c => ({
@@ -81,6 +82,7 @@ export const generateDailyChallenges = internalAction({
           label: original.label,
           points: original.points,
           ...(original.dimension !== undefined ? { dimension: original.dimension } : {}),
+          ...(original.validationType !== undefined ? { validationType: original.validationType } : {}),
           date: today,
           carriedOver: true,
         });
@@ -93,6 +95,7 @@ export const generateDailyChallenges = internalAction({
           label: challenge.label,
           points: challenge.points,
           ...(challenge.dimension !== undefined ? { dimension: challenge.dimension } : {}),
+          ...(challenge.validationType !== undefined ? { validationType: challenge.validationType } : {}),
           date: today,
         });
       }

@@ -11,13 +11,14 @@ import { internalAction } from './_generated/server';
 
 type PersonalizedResult = {
   carriedOverLabels: string[];
-  newChallenges: Array<{ label: string; points: number; dimension?: string }>;
+  newChallenges: Array<{ label: string; points: number; dimension?: string; validationType?: 'conversation' | 'github' }>;
 };
 
 export const generatePersonalizedChallenges = internalAction({
   args: {
     userId: v.string(),
     maxNew: v.number(),
+    hasGitHub: v.optional(v.boolean()),
     projectScores: v.optional(v.object({
       validation: v.number(),
       design: v.number(),
@@ -31,7 +32,7 @@ export const generatePersonalizedChallenges = internalAction({
       dimension: v.optional(v.string()),
     })),
   },
-  handler: async (_ctx, { maxNew, projectScores, lastSessionSummary, yesterdayChallenges }): Promise<PersonalizedResult> => {
+  handler: async (_ctx, { maxNew, hasGitHub, projectScores, lastSessionSummary, yesterdayChallenges }): Promise<PersonalizedResult> => {
     try {
       const weakestDimension = projectScores
         ? Object.entries(projectScores).sort(([, a], [, b]) => a - b)[0]?.[0]
@@ -41,26 +42,29 @@ export const generatePersonalizedChallenges = internalAction({
         ? `Yesterday's uncompleted challenges (decide which are still relevant today):\n${yesterdayChallenges.map(c => `- "${c.label}" (${c.points} pts${c.dimension ? `, ${c.dimension}` : ''})`).join('\n')}\n\n`
         : '';
       const scoresSection = projectScores
-        ? `Project radar scores (0-100): validation=${projectScores.validation}, design=${projectScores.design}, development=${projectScores.development}, distribution=${projectScores.distribution}. Weakest area: ${weakestDimension}.\n`
+        ? `Project radar scores (0 to 100): validation=${projectScores.validation}, design=${projectScores.design}, development=${projectScores.development}, distribution=${projectScores.distribution}. Weakest area: ${weakestDimension}.\n`
         : '';
       const summarySection = lastSessionSummary ? `Last session: ${lastSessionSummary}\n` : '';
 
+      const githubSection = hasGitHub
+        ? 'This project has GitHub connected. Some challenges can be verified automatically via GitHub activity (commits, PRs, issues). For those, set validationType to "github". For challenges verified via conversation, set validationType to "conversation" or omit it.\n'
+        : '';
+
       const prompt = `You are a challenge advisor for a vibe coder productivity app.
 
-${yesterdaySection}${scoresSection}${summarySection}
+${yesterdaySection}${scoresSection}${summarySection}${githubSection}
 Generate 3 personalized daily challenges. Focus on the weakest project area. Each must be completable in one work session.
 
 Respond with ONLY valid JSON:
 {
   "carriedOverLabels": ["exact label from yesterday if still relevant today"],
   "newChallenges": [
-    {"label": "Action-oriented challenge", "points": 75, "dimension": "validation"},
-    {"label": "Another challenge", "points": 100, "dimension": "development"},
-    {"label": "Third challenge", "points": 50}
+    {"label": "Action-oriented challenge", "points": 75, "dimension": "validation", "validationType": "conversation"},
+    {"label": "Push a commit on your active branch", "points": 100, "dimension": "development", "validationType": "github"}
   ]
 }
 
-Points: 50-150. dimension is optional: "validation", "design", "development", "distribution".`;
+Points: 50-150. dimension is optional: "validation", "design", "development", "distribution". validationType is optional: "conversation" or "github".`;
 
       const { text } = await generateText({
         model: 'anthropic/claude-haiku-4.5',
@@ -75,9 +79,17 @@ Points: 50-150. dimension is optional: "validation", "design", "development", "d
         : [];
 
       const newChallenges = Array.isArray(parsed.newChallenges)
-        ? (parsed.newChallenges as Array<{ label: string; points: number; dimension?: string }>)
+        ? (parsed.newChallenges as Array<{ label: string; points: number; dimension?: string; validationType?: string }>)
             .filter(c => typeof c.label === 'string' && typeof c.points === 'number')
             .slice(0, maxNew)
+            .map(c => ({
+              label: c.label,
+              points: c.points,
+              ...(c.dimension ? { dimension: c.dimension } : {}),
+              ...(c.validationType === 'github' || c.validationType === 'conversation'
+                ? { validationType: c.validationType as 'conversation' | 'github' }
+                : {}),
+            }))
         : [];
 
       return { carriedOverLabels, newChallenges };
@@ -176,6 +188,7 @@ export const refillChallengeSlotsForUser = internalAction({
         points: challenge.points,
         date,
         ...(challenge.dimension ? { dimension: challenge.dimension } : {}),
+        ...(challenge.validationType ? { validationType: challenge.validationType } : {}),
       });
     }
   },

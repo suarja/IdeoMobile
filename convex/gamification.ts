@@ -789,8 +789,9 @@ export const createDailyChallengeInternal = internalMutation({
     dimension: v.optional(v.string()),
     date: v.string(),
     carriedOver: v.optional(v.boolean()),
+    validationType: v.optional(v.union(v.literal('conversation'), v.literal('github'))),
   },
-  handler: async (ctx, { userId, label, points, dimension, date, carriedOver }) => {
+  handler: async (ctx, { userId, label, points, dimension, date, carriedOver, validationType }) => {
     return ctx.db.insert('dailyChallenges', {
       userId,
       date,
@@ -800,6 +801,7 @@ export const createDailyChallengeInternal = internalMutation({
       points,
       completed: false,
       ...(carriedOver !== undefined ? { carriedOver } : {}),
+      ...(validationType !== undefined ? { validationType } : {}),
     });
   },
 });
@@ -839,6 +841,7 @@ export const getActiveProjectContextForUser = internalQuery({
           }
         : null,
       lastSessionSummary,
+      hasGitHub: !!(project.projectLinks?.github),
     };
   },
 });
