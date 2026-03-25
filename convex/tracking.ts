@@ -21,7 +21,14 @@ Your job:
 2b. If you need more commits from a specific branch (after identifying it via scrapeUrl), call getGitHubCommits with the branch name.
 3. Summarize what changed since the last report (commits, new branches, open issues trend, stars)
 4. Flag any risks: no commits in 7+ days, spike in open issues, branch divergence from main
-5. Call saveReport with the full structured report and a 2-3 sentence tldr for tomorrow's context
+3.5. Call updateProjectScores with estimated scores (0-100) for each dimension based on what you observed:
+     - development: number of commits, active branches, open PRs
+     - validation: issues closed, testing activity
+     - design: any design-related commits or file changes
+     - distribution: stars/forks delta, deploy-related commits
+     Only include dimensions where you have evidence. Omit ones you can't estimate.
+5. Call completeChallenge for any active GitHub challenge whose condition you observed being met (0 to N calls). Be conservative — only call if you have concrete evidence.
+6. Call saveReport with the full structured report and a 2-3 sentence tldr for tomorrow's context
 
 Report format (markdown):
 ## Daily Tracking — [date]
@@ -30,6 +37,8 @@ Report format (markdown):
 - [message] ([date])
 **Repo health:** Stars: X (+/-N) | Forks: X | Open issues: X
 **Signals:** [key observations]
+**Project scores updated:** development=X, validation=X (or "No score update" if not called)
+**Challenges auto-completed:** [list or "none"]
 **Risks:** [if any]
 
 Keep it concise — this is a developer standup, not a blog post.`;
@@ -46,17 +55,20 @@ export const trackingAgent = new Agent(components.agent, {
 // ---------------------------------------------------------------------------
 
 type TrackingMessage = { role: 'user' | 'assistant'; content: string; createdAt: number };
+type ActiveChallenge = { id: string; label: string };
 
 function buildTrackingPrompt({
   projectName,
   githubUrl,
   recentTldrs,
   todayMessages,
+  activeChallenges,
 }: {
   projectName: string;
   githubUrl: string;
   recentTldrs: string[];
   todayMessages: TrackingMessage[];
+  activeChallenges: ActiveChallenge[];
 }): string {
   const lines: string[] = [
     `Project: ${projectName}`,
@@ -81,6 +93,14 @@ function buildTrackingPrompt({
   else {
     lines.push('');
     lines.push('No conversation activity today.');
+  }
+
+  if (activeChallenges.length > 0) {
+    lines.push('');
+    lines.push('Active GitHub challenges today (call completeChallenge if you detect matching activity):');
+    for (const c of activeChallenges) {
+      lines.push(`- [id: ${c.id}] "${c.label}"`);
+    }
   }
 
   lines.push('');
@@ -188,6 +208,50 @@ function buildSaveReportTool({ runMutation, userId, trackingThreadId, projectId 
   });
 }
 
+type UpdateProjectScoresToolCtx = {
+  runMutation: RunMutationFn;
+  threadId: string;
+};
+
+function buildUpdateProjectScoresTool({ runMutation, threadId }: UpdateProjectScoresToolCtx) {
+  return tool({
+    description: 'Update the project radar scores based on GitHub activity analysis. Call this after analyzing commits and issues.',
+    inputSchema: z.object({
+      validation: z.number().min(0).max(100).optional().describe('Score 0-100 for validation dimension (user interviews, testing, issues closed)'),
+      design: z.number().min(0).max(100).optional().describe('Score 0-100 for design dimension (UI commits, design files)'),
+      development: z.number().min(0).max(100).optional().describe('Score 0-100 for development dimension (code commits, branches, PRs)'),
+      distribution: z.number().min(0).max(100).optional().describe('Score 0-100 for distribution dimension (deploy commits, stars/forks delta)'),
+    }),
+    execute: async (scores: { validation?: number; design?: number; development?: number; distribution?: number }) => {
+      await runMutation(internal.gamification.updateProjectScores, { threadId, scores });
+      return 'Project scores updated.';
+    },
+  });
+}
+
+type CompleteChallengeToolCtx = {
+  runMutation: RunMutationFn;
+  userId: string;
+};
+
+function buildCompleteChallengeTool({ runMutation, userId }: CompleteChallengeToolCtx) {
+  return tool({
+    description: 'Mark a GitHub-verified challenge as completed based on detected activity. Only call when you have concrete evidence (a matching commit, closed issue, or opened PR).',
+    inputSchema: z.object({
+      challengeId: z.string().describe('The _id of the challenge from the active challenges list'),
+      completionNote: z.string().describe('One sentence explaining what was detected, e.g. "Push detected on feat/api branch at 22:14"'),
+    }),
+    execute: async ({ challengeId, completionNote }: { challengeId: string; completionNote: string }) => {
+      await runMutation(internal.gamification.completeDailyChallengeFromCron, {
+        challengeId: challengeId as Id<'dailyChallenges'>,
+        userId,
+        completionNote,
+      });
+      return `Challenge ${challengeId} marked as completed.`;
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Cron action
 // ---------------------------------------------------------------------------
@@ -241,11 +305,17 @@ export const generateDailyTrackingReports = internalAction({
 
       const recentTldrs = recentTldrEntries.map((e: { date: string; tldr: string }) => `[${e.date}] ${e.tldr}`);
 
+      const activeChallenges = await ctx.runQuery(internal.gamification.getDailyChallengesForValidation, {
+        userId: project.userId,
+        date: today,
+      });
+
       const prompt = buildTrackingPrompt({
         projectName: project.name ?? 'Unnamed project',
         githubUrl,
         recentTldrs,
         todayMessages: todayMessages as TrackingMessage[],
+        activeChallenges: activeChallenges.map((c: { _id: string; label: string }) => ({ id: c._id, label: c.label })),
       });
 
       // Ensure persistent tracking thread for this project
@@ -278,6 +348,14 @@ export const generateDailyTrackingReports = internalAction({
             owner,
             repo,
             githubToken,
+          }),
+          updateProjectScores: buildUpdateProjectScoresTool({
+            runMutation: ctx.runMutation.bind(ctx),
+            threadId: project.threadId,
+          }),
+          completeChallenge: buildCompleteChallengeTool({
+            runMutation: ctx.runMutation.bind(ctx),
+            userId: project.userId,
           }),
           saveReport: buildSaveReportTool({ runMutation: ctx.runMutation.bind(ctx), userId: project.userId, trackingThreadId, projectId: project._id }),
         },

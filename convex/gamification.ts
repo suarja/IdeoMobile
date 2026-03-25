@@ -502,6 +502,38 @@ export const completeDailyChallengeInternal = internalMutation({
   },
 });
 
+export const completeDailyChallengeFromCron = internalMutation({
+  args: {
+    challengeId: v.id('dailyChallenges'),
+    userId: v.string(),
+    completionNote: v.string(),
+  },
+  handler: async (ctx, { challengeId, userId, completionNote }) => {
+    const challenge = await ctx.db.get(challengeId);
+    if (!challenge || challenge.completed)
+      return;
+    await ctx.db.patch(challengeId, {
+      completed: true,
+      completedAt: Date.now(),
+      completedByCron: true,
+      completionNote,
+    });
+    await grantPoints(ctx, userId, challenge.points);
+    // Note: does NOT trigger slot refill — cron handles that at daily generation
+  },
+});
+
+export const getDailyChallengesForValidation = internalQuery({
+  args: { userId: v.string(), date: v.string() },
+  handler: async (ctx, { userId, date }) => {
+    const challenges = await ctx.db
+      .query('dailyChallenges')
+      .withIndex('by_userId_date', q => q.eq('userId', userId).eq('date', date))
+      .collect();
+    return challenges.filter(c => !c.completed && c.failed !== true && c.validationType === 'github');
+  },
+});
+
 export const updateValidationAttempt = internalMutation({
   args: {
     challengeId: v.id('dailyChallenges'),
@@ -789,9 +821,8 @@ export const createDailyChallengeInternal = internalMutation({
     dimension: v.optional(v.string()),
     date: v.string(),
     carriedOver: v.optional(v.boolean()),
-    validationType: v.optional(v.union(v.literal('conversation'), v.literal('github'))),
   },
-  handler: async (ctx, { userId, label, points, dimension, date, carriedOver, validationType }) => {
+  handler: async (ctx, { userId, label, points, dimension, date, carriedOver }) => {
     return ctx.db.insert('dailyChallenges', {
       userId,
       date,
@@ -801,7 +832,6 @@ export const createDailyChallengeInternal = internalMutation({
       points,
       completed: false,
       ...(carriedOver !== undefined ? { carriedOver } : {}),
-      ...(validationType !== undefined ? { validationType } : {}),
     });
   },
 });
