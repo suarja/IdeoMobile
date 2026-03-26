@@ -321,6 +321,16 @@ function buildCommonTools(
         return `%%SESSION_END%%${payload}`;
       },
     }),
+    unlockMarketAnalysis: tool({
+      description: 'Unlock the deep market analysis for the current project. Call when the user has refined their idea across at least 2 dimensions and you have enough context to run a meaningful competitor and market size analysis. Once unlocked, the user can launch it from the Insights tab.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        if (!pid)
+          return 'No active project found.';
+        await runMutation(internal.market.setMarketAnalysisAvailable, { projectId: pid });
+        return 'Market analysis unlocked. Inform the user: their deep market analysis is now available in the Insights tab. They can tap "Launch" to start a 3-5 minute automated analysis.';
+      },
+    }),
   };
 }
 
