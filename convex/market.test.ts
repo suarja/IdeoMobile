@@ -1,13 +1,31 @@
 import { convexTest } from 'convex-test';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { api } from './_generated/api';
 import schema from './schema';
 
+// Stub out workflow.start — convex-test's edge-runtime env doesn't support
+// the timer-based scheduling that WorkflowManager.start uses internally.
+vi.mock('@convex-dev/workflow', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@convex-dev/workflow')>();
+  return {
+    ...original,
+    WorkflowManager: class extends original.WorkflowManager {
+      override start(..._args: any[]) {
+        return Promise.resolve('' as any);
+      }
+    },
+  };
+});
+
 const modules = import.meta.glob('./**/*.ts');
+
+function makeT() {
+  return convexTest(schema, modules);
+}
 
 describe('launchMarketAnalysis', () => {
   it('throws if not authenticated', async () => {
-    const t = convexTest(schema, modules);
+    const t = makeT();
     const projectId = await t.run(async (ctx) => {
       return ctx.db.insert('projects', {
         userId: 'user1',
@@ -24,7 +42,7 @@ describe('launchMarketAnalysis', () => {
   });
 
   it('throws if marketAnalysisAvailable is false', async () => {
-    const t = convexTest(schema, modules);
+    const t = makeT();
     const projectId = await t.run(async (ctx) => {
       return ctx.db.insert('projects', {
         userId: 'user1',
@@ -41,7 +59,7 @@ describe('launchMarketAnalysis', () => {
   });
 
   it('creates a pending job when available', async () => {
-    const t = convexTest(schema, modules);
+    const t = makeT();
     const projectId = await t.run(async (ctx) => {
       return ctx.db.insert('projects', {
         userId: 'user1',
@@ -61,7 +79,7 @@ describe('launchMarketAnalysis', () => {
   });
 
   it('throws if a job is already pending or running', async () => {
-    const t = convexTest(schema, modules);
+    const t = makeT();
     const projectId = await t.run(async (ctx) => {
       return ctx.db.insert('projects', {
         userId: 'user1',

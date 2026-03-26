@@ -1,8 +1,11 @@
+import { anthropic } from '@ai-sdk/anthropic';
 import { vWorkflowId, WorkflowManager } from '@convex-dev/workflow';
 import { vResultValidator } from '@convex-dev/workpool';
+import { generateText } from 'ai';
 import { v } from 'convex/values';
-import { components } from './_generated/api';
-import { internalMutation, mutation, query } from './_generated/server';
+import { components, internal } from './_generated/api';
+import { internalAction, internalMutation, mutation, query } from './_generated/server';
+import { webSearch } from './tools/webSearch/index';
 
 // ---------------------------------------------------------------------------
 // Workflow manager
@@ -104,6 +107,8 @@ export const launchMarketAnalysis = mutation({
     if (!project.marketAnalysisAvailable)
       throw new Error('Market analysis not available for this project');
 
+    const projectName = project.name ?? 'My Project';
+
     // Idempotence: block if already running
     const existing = await ctx.db
       .query('marketAnalysisJobs')
@@ -124,9 +129,153 @@ export const launchMarketAnalysis = mutation({
       createdAt: Date.now(),
     });
 
-    // Workflow will be started in Task 4. For now, just create the job.
-    // TODO Task 4: replace this comment with marketWorkflow.start(...)
+    await marketWorkflow.start(
+      ctx,
+      internal.market.runMarketWorkflow as any,
+      { projectId, jobId, userId, projectName },
+      {
+        onComplete: internal.market.onWorkflowComplete,
+        context: jobId,
+      },
+    );
 
     return jobId;
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Step actions — retryable internalActions called by the workflow
+// ---------------------------------------------------------------------------
+
+export const searchAndAnalyzeAction = internalAction({
+  args: {
+    query: v.string(),
+    sectionTitle: v.string(),
+    analysisInstruction: v.string(),
+  },
+  handler: async (_ctx, { query, sectionTitle, analysisInstruction }) => {
+    const results = await webSearch(query);
+    const resultsText = results
+      .map(r => `**${r.title}**\n${r.content}`)
+      .join('\n\n');
+
+    const { text } = await generateText({
+      model: anthropic('claude-haiku-4-5'),
+      prompt: `${analysisInstruction}\n\nSearch results:\n${resultsText}\n\nWrite a concise markdown section titled "## ${sectionTitle}" (3-6 bullet points or short paragraphs). Be specific, cite names when found.`,
+    });
+    return text;
+  },
+});
+
+export const synthesizeAndSaveAction = internalAction({
+  args: {
+    projectId: v.id('projects'),
+    userId: v.string(),
+    projectName: v.string(),
+    sections: v.array(v.string()),
+  },
+  handler: async (ctx, { projectId, userId, projectName, sections }) => {
+    const combinedSections = sections.join('\n\n');
+
+    const { text: synthesis } = await generateText({
+      model: anthropic('claude-sonnet-4-6'),
+      prompt: `You are a sharp startup analyst. Based on the following market research sections for "${projectName}", write a "## Synthèse" section with:\n- 3 key strengths\n- 3 key risks or weaknesses\n- A brief recommendation (go/no-go/pivot)\n\nResearch:\n${combinedSections}`,
+    });
+
+    const fullContent = `# Market Analysis — ${projectName}\n\n${combinedSections}\n\n${synthesis}`;
+
+    const { text: tldr } = await generateText({
+      model: anthropic('claude-haiku-4-5'),
+      prompt: `Write 2 sentences summarizing this market analysis for "${projectName}":\n${fullContent.slice(0, 3000)}`,
+    });
+
+    const date = new Date().toISOString().split('T')[0];
+    await ctx.runMutation(internal.artifacts.saveArtifact, {
+      userId,
+      projectId,
+      type: 'market',
+      title: `Market Analysis — ${projectName}`,
+      content: fullContent,
+      tldr,
+      date,
+    });
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Workflow definition — 5-step sequential pipeline
+// ---------------------------------------------------------------------------
+
+export const runMarketWorkflow = marketWorkflow.define({
+  args: {
+    projectId: v.id('projects'),
+    jobId: v.id('marketAnalysisJobs'),
+    userId: v.string(),
+    projectName: v.string(),
+  },
+  returns: v.null(),
+  handler: async (step, { projectId, jobId, userId, projectName }): Promise<null> => {
+    // Step 1 — Direct competitors
+    await step.runMutation(internal.market.updateJobStep, {
+      jobId,
+      currentStep: 'Concurrents directs',
+      stepsDone: 0,
+    });
+    const competitors = await step.runAction(internal.market.searchAndAnalyzeAction, {
+      query: `${projectName} competitors app 2025`,
+      sectionTitle: 'Concurrents directs',
+      analysisInstruction: `Identify the main direct competitors for a product called "${projectName}". List name, positioning, and key differentiator.`,
+    });
+
+    // Step 2 — Alternatives
+    await step.runMutation(internal.market.updateJobStep, {
+      jobId,
+      currentStep: 'Alternatives & substituts',
+      stepsDone: 1,
+    });
+    const alternatives = await step.runAction(internal.market.searchAndAnalyzeAction, {
+      query: `${projectName} alternatives tools market`,
+      sectionTitle: 'Alternatives & substituts',
+      analysisInstruction: `Identify indirect competitors and substitute tools for "${projectName}". What do people use today instead?`,
+    });
+
+    // Step 3 — Market size
+    await step.runMutation(internal.market.updateJobStep, {
+      jobId,
+      currentStep: 'Taille de marché (TAM/SAM/SOM)',
+      stepsDone: 2,
+    });
+    const marketSize = await step.runAction(internal.market.searchAndAnalyzeAction, {
+      query: `${projectName} market size TAM SAM SOM 2025`,
+      sectionTitle: 'Taille de marché',
+      analysisInstruction: `Estimate the market size for "${projectName}". Include TAM, SAM, SOM if data is available. Cite numbers and sources.`,
+    });
+
+    // Step 4 — Trends
+    await step.runMutation(internal.market.updateJobStep, {
+      jobId,
+      currentStep: 'Tendances 2025-2026',
+      stepsDone: 3,
+    });
+    const trends = await step.runAction(internal.market.searchAndAnalyzeAction, {
+      query: `${projectName} market trends 2025 2026`,
+      sectionTitle: 'Tendances 2025-2026',
+      analysisInstruction: `What are the key market trends relevant to "${projectName}" for 2025-2026? What's growing, declining, or emerging?`,
+    });
+
+    // Step 5 — Synthesis (saves artifact)
+    await step.runMutation(internal.market.updateJobStep, {
+      jobId,
+      currentStep: 'Synthèse',
+      stepsDone: 4,
+    });
+    await step.runAction(internal.market.synthesizeAndSaveAction, {
+      projectId,
+      userId,
+      projectName,
+      sections: [competitors, alternatives, marketSize, trends],
+    });
+
+    return null;
   },
 });
