@@ -131,6 +131,7 @@ export const launchMarketAnalysis = mutation({
 
     await marketWorkflow.start(
       ctx,
+      // Type assertion needed until `npx convex dev` regenerates _generated/api.d.ts.
       internal.market.runMarketWorkflow as any,
       { projectId, jobId, userId, projectName },
       {
