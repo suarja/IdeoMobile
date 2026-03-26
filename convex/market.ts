@@ -8,6 +8,8 @@ import { internalMutation, mutation, query } from './_generated/server';
 // Workflow manager
 // ---------------------------------------------------------------------------
 
+// Type assertion needed until `npx convex dev` regenerates _generated/api.d.ts with the workflow component.
+// workflow is registered in convex.config.ts via `app.use(workflow)` and will be properly typed after deployment.
 export const marketWorkflow = new WorkflowManager(components.workflow as any);
 
 // ---------------------------------------------------------------------------
