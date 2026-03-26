@@ -6,7 +6,7 @@ export const saveArtifact = internalMutation({
     userId: v.string(),
     threadId: v.optional(v.string()),
     projectId: v.optional(v.id('projects')),
-    type: v.union(v.literal('validation'), v.literal('tracking')),
+    type: v.union(v.literal('validation'), v.literal('tracking'), v.literal('market')),
     title: v.string(),
     content: v.string(),
     tldr: v.string(),
@@ -19,7 +19,7 @@ export const saveArtifact = internalMutation({
 
 export const listArtifacts = query({
   args: {
-    type: v.union(v.literal('validation'), v.literal('tracking')),
+    type: v.union(v.literal('validation'), v.literal('tracking'), v.literal('market')),
     projectId: v.optional(v.id('projects')),
   },
   handler: async (ctx, { type, projectId }) => {
@@ -83,6 +83,31 @@ export const getLatestTrackingArtifact = internalQuery({
     return ctx.db
       .query('artifacts')
       .withIndex('by_project_type', q => q.eq('projectId', projectId).eq('type', 'tracking'))
+      .order('desc')
+      .first();
+  },
+});
+
+export const getLatestMarketArtifact = internalQuery({
+  args: { projectId: v.id('projects') },
+  handler: async (ctx, { projectId }) => {
+    return ctx.db
+      .query('artifacts')
+      .withIndex('by_project_type', q => q.eq('projectId', projectId).eq('type', 'market'))
+      .order('desc')
+      .first();
+  },
+});
+
+export const getLatestMarketArtifactPublic = query({
+  args: { projectId: v.id('projects') },
+  handler: async (ctx, { projectId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity)
+      return null;
+    return ctx.db
+      .query('artifacts')
+      .withIndex('by_project_type', q => q.eq('projectId', projectId).eq('type', 'market'))
       .order('desc')
       .first();
   },
