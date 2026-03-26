@@ -27,3 +27,4 @@ expo-env.d.ts
 
 .superpowers.worktrees/
 .superpowers/
+.worktrees
