@@ -123,6 +123,7 @@ export default defineSchema({
       tiktok: v.optional(v.string()),
       instagram: v.optional(v.string()),
     })),
+    marketAnalysisAvailable: v.optional(v.boolean()),
   })
     .index('by_userId', ['userId'])
     .index('by_threadId', ['threadId'])
@@ -180,7 +181,7 @@ export default defineSchema({
     userId: v.string(),
     threadId: v.optional(v.string()),
     projectId: v.optional(v.id('projects')),
-    type: v.union(v.literal('validation'), v.literal('tracking')),
+    type: v.union(v.literal('validation'), v.literal('tracking'), v.literal('market')),
     title: v.string(),
     content: v.string(),
     tldr: v.string(),
@@ -191,6 +192,26 @@ export default defineSchema({
     .index('by_user_date', ['userId', 'date'])
     .index('by_project_type', ['projectId', 'type'])
     .index('by_project_date', ['projectId', 'date']),
+
+  // --- Market Analysis Jobs ---
+
+  marketAnalysisJobs: defineTable({
+    projectId: v.id('projects'),
+    userId: v.string(),
+    status: v.union(
+      v.literal('pending'),
+      v.literal('running'),
+      v.literal('done'),
+      v.literal('error'),
+    ),
+    currentStep: v.string(),
+    stepsTotal: v.number(),
+    stepsDone: v.number(),
+    errorMessage: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index('by_project', ['projectId'])
+    .index('by_user', ['userId']),
 
   // --- App Config ---
 

@@ -52,6 +52,7 @@
     "@ai-sdk/openai": "^2.0.99",
     "@clerk/expo": "^3.1.2",
     "@convex-dev/agent": "^0.3.2",
+    "@convex-dev/workflow": "^0.3.8",
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo/metro-runtime": "~6.1.2",
     "@gorhom/bottom-sheet": "^5.2.8",
