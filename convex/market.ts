@@ -30,13 +30,6 @@ export const updateJobStep = internalMutation({
   },
 });
 
-export const setJobDone = internalMutation({
-  args: { jobId: v.id('marketAnalysisJobs') },
-  handler: async (ctx, { jobId }) => {
-    await ctx.db.patch(jobId, { status: 'done' });
-  },
-});
-
 export const setJobError = internalMutation({
   args: { jobId: v.id('marketAnalysisJobs'), errorMessage: v.string() },
   handler: async (ctx, { jobId, errorMessage }) => {
@@ -63,7 +56,8 @@ export const onWorkflowComplete = internalMutation({
   },
   handler: async (ctx, { result, context: jobId }) => {
     if (result.kind === 'success') {
-      await ctx.db.patch(jobId, { status: 'done' });
+      const job = await ctx.db.get(jobId);
+      await ctx.db.patch(jobId, { status: 'done', stepsDone: job?.stepsTotal ?? 5 });
     }
     else if (result.kind === 'failed') {
       await ctx.db.patch(jobId, { status: 'error', errorMessage: result.error });

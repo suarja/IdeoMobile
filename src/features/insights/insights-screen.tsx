@@ -92,8 +92,11 @@ export function InsightsScreen() {
     try {
       await launchMarketAnalysis({ projectId });
     }
-    catch {
-      // already running or not available
+    catch (e) {
+      const message = e instanceof Error ? e.message : '';
+      if (!message.includes('already running') && !message.includes('not available')) {
+        console.error('[market] unexpected launch error:', e);
+      }
     }
   }, [launchMarketAnalysis, projectId]);
 

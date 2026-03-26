@@ -17,9 +17,10 @@ export function useArtifacts(type: ArtifactType, projectId?: Id<'projects'> | nu
 }
 
 export function useMarketAnalysisJob(projectId: Id<'projects'> | null | undefined) {
+  const { isAuthenticated } = useConvexAuth();
   return useQuery(
     api.market.getMarketJob,
-    projectId ? { projectId } : 'skip',
+    isAuthenticated && projectId ? { projectId } : 'skip',
   );
 }
 
@@ -28,8 +29,9 @@ export function useLaunchMarketAnalysis() {
 }
 
 export function useLatestMarketArtifact(projectId: Id<'projects'> | null | undefined) {
+  const { isAuthenticated } = useConvexAuth();
   return useQuery(
     api.artifacts.getLatestMarketArtifactPublic,
-    projectId ? { projectId } : 'skip',
+    isAuthenticated && projectId ? { projectId } : 'skip',
   );
 }
