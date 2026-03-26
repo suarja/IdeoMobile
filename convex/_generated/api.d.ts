@@ -34,6 +34,7 @@ import type * as tools_webSearch_anthropicNative from "../tools/webSearch/anthro
 import type * as tools_webSearch_index from "../tools/webSearch/index.js";
 import type * as tools_webSearch_perplexity from "../tools/webSearch/perplexity.js";
 import type * as tools_webSearch_tavily from "../tools/webSearch/tavily.js";
+import type * as market from "../market.js";
 import type * as tracking from "../tracking.js";
 import type * as userProfiles from "../userProfiles.js";
 
@@ -59,6 +60,7 @@ declare const fullApi: ApiFromModules<{
   gamification: typeof gamification;
   github: typeof github;
   http: typeof http;
+  market: typeof market;
   memory: typeof memory;
   playground: typeof playground;
   projects: typeof projects;
@@ -2952,4 +2954,5 @@ export declare const components: {
       };
     };
   };
+  workflow: Record<string, any>;
 };
