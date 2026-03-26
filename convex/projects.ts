@@ -75,6 +75,7 @@ export const getActiveProject = query({
       projectId: project._id,
       threadId: project.threadId,
       name: project.name ?? null,
+      marketAnalysisAvailable: project.marketAnalysisAvailable ?? false,
     };
   },
 });

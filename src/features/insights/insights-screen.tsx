@@ -11,10 +11,11 @@ import { colors, FocusAwareStatusBar, ScrollView, Text, View } from '@/component
 import { useModal } from '@/components/ui/modal';
 import { useActiveProject } from '@/features/idea/api';
 import { translate } from '@/lib/i18n';
-import { useArtifacts } from './api';
+import { useArtifacts, useLatestMarketArtifact, useLaunchMarketAnalysis, useMarketAnalysisJob } from './api';
 import { ArtifactCard } from './components/artifact-card';
 import { ArtifactDetailSheet } from './components/artifact-detail-sheet';
 import { InsightsSegmentControl } from './components/insights-segment-control';
+import { MarketAnalysisBanner } from './components/market-analysis-banner';
 
 function ArtifactList({
   type,
@@ -81,6 +82,21 @@ export function InsightsScreen() {
   const activeType: ArtifactType = activeTab === 'validation' ? 'validation' : 'tracking';
   const projectId = activeProject?.projectId ?? null;
 
+  const marketJob = useMarketAnalysisJob(projectId);
+  const marketArtifact = useLatestMarketArtifact(projectId);
+  const launchMarketAnalysis = useLaunchMarketAnalysis();
+
+  const handleLaunchMarket = React.useCallback(async () => {
+    if (!projectId)
+      return;
+    try {
+      await launchMarketAnalysis({ projectId });
+    }
+    catch {
+      // already running or not available
+    }
+  }, [launchMarketAnalysis, projectId]);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.brand.bg }}>
       <FocusAwareStatusBar />
@@ -91,6 +107,16 @@ export function InsightsScreen() {
         contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 120 }}
       >
         <InsightsSegmentControl activeTab={activeTab} onChange={setActiveTab} />
+
+        {activeTab === 'validation' && activeProject?.marketAnalysisAvailable && projectId && (
+          <MarketAnalysisBanner
+            projectId={projectId}
+            job={marketJob}
+            marketArtifact={marketArtifact}
+            onLaunch={handleLaunchMarket}
+            onView={handleSelect}
+          />
+        )}
 
         <ArtifactList type={activeType} projectId={projectId} onSelect={handleSelect} />
       </ScrollView>
