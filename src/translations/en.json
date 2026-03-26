@@ -31,6 +31,13 @@
     "detail_close": "Close",
     "empty_suivi": "Your daily tracking reports will appear here.",
     "empty_validation": "Start a validation conversation to see your reports here.",
+    "market_available_subtitle": "3-5 min automated analysis of your market.",
+    "market_available_title": "Deep market analysis available",
+    "market_done_label": "Market analysis complete",
+    "market_error": "Analysis failed",
+    "market_launch": "Launch",
+    "market_retry": "Retry",
+    "market_view": "View",
     "segment_suivi": "Tracking",
     "segment_validation": "Validation",
     "tab_label": "Insights"

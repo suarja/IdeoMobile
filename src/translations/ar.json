@@ -31,6 +31,13 @@
     "detail_close": "إغلاق",
     "empty_suivi": "ستظهر تقارير التتبع اليومية هنا.",
     "empty_validation": "ابدأ محادثة للتحقق من صحة الفكرة لرؤية تقاريرك هنا.",
+    "market_available_subtitle": "تحليل آلي للسوق في 3-5 دقائق.",
+    "market_available_title": "تحليل السوق المعمّق متاح",
+    "market_done_label": "تحليل السوق مكتمل",
+    "market_error": "فشل التحليل",
+    "market_launch": "إطلاق",
+    "market_retry": "إعادة المحاولة",
+    "market_view": "عرض",
     "segment_suivi": "التتبع",
     "segment_validation": "التحقق",
     "tab_label": "رؤى"
