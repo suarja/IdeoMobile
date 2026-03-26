@@ -21,9 +21,9 @@ export function MarketAnalysisBanner({ job, marketArtifact, onLaunch, onView }: 
     return (
       <View style={styles.banner}>
         <View style={styles.row}>
-          <Text style={styles.label}>{translate('insights.market_done_label' as any)}</Text>
+          <Text style={styles.label}>{translate('insights.market_done_label' as any /* i18n */)}</Text>
           <TouchableOpacity onPress={() => onView(marketArtifact)} style={styles.button}>
-            <Text style={styles.buttonText}>{translate('insights.market_view' as any)}</Text>
+            <Text style={styles.buttonText}>{translate('insights.market_view' as any /* i18n */)}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -58,9 +58,9 @@ export function MarketAnalysisBanner({ job, marketArtifact, onLaunch, onView }: 
     return (
       <View style={[styles.banner, styles.bannerError]}>
         <View style={styles.row}>
-          <Text style={[styles.label, { flex: 1 }]}>{translate('insights.market_error' as any)}</Text>
+          <Text style={[styles.label, { flex: 1 }]}>{translate('insights.market_error' as any /* i18n */)}</Text>
           <TouchableOpacity onPress={onLaunch} style={styles.button}>
-            <Text style={styles.buttonText}>{translate('insights.market_retry' as any)}</Text>
+            <Text style={styles.buttonText}>{translate('insights.market_retry' as any /* i18n */)}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -72,11 +72,11 @@ export function MarketAnalysisBanner({ job, marketArtifact, onLaunch, onView }: 
     <View style={styles.banner}>
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.label}>{translate('insights.market_available_title' as any)}</Text>
-          <Text style={styles.subtitle}>{translate('insights.market_available_subtitle' as any)}</Text>
+          <Text style={styles.label}>{translate('insights.market_available_title' as any /* i18n */)}</Text>
+          <Text style={styles.subtitle}>{translate('insights.market_available_subtitle' as any /* i18n */)}</Text>
         </View>
         <TouchableOpacity onPress={onLaunch} style={styles.button}>
-          <Text style={styles.buttonText}>{translate('insights.market_launch' as any)}</Text>
+          <Text style={styles.buttonText}>{translate('insights.market_launch' as any /* i18n */)}</Text>
         </TouchableOpacity>
       </View>
     </View>
